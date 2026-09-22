@@ -1,14 +1,18 @@
-"""Türkçe benchmark'ı jev-test'ten JSON'a dondurur.
+"""Kendi soru setini bu deponun JSON şemasına çeviren ÖRNEK betik.
 
-    python araclar/veriseti_aktar.py                    # ../jev-test varsayılan
-    python araclar/veriseti_aktar.py --kaynak D:/x/jev-test
+    python araclar/veriseti_aktar.py --kaynak /yol/kendi-repom --cikti veri/benim.json
 
-Neden kopya: `veri/benchmark_tr.json` repoya giriyor, böylece bu proje jev-test
-olmadan da koşar ve ölçüm tekrar edilebilir kalır. Kaynak veri seti değişirse bu
-betik yeniden çalıştırılır; diff'te ne değiştiği görünür.
+Olduğu gibi çalışmaz -- kaynağın kendi biçimine göre `yukle()` ve alan
+eşlemesini düzenlemen beklenir. Burada beklenen kaynak, içinde `SORULAR` adlı
+bir liste bulunduran `benchmark/veriseti.py` modülüdür; her öğede `id`,
+`kategori`, `durum`, `talimat_tr`, `talimat_en`, `secenekler`, `dogru`,
+`donusum`, `not_` alanları vardır.
 
-Yalnız `SORULAR` (Choice) aktarılır. `NOUL_SETLERI` dışarıda: systemone-tr'de
-noul primitifi yok, dolayısıyla karşılaştırılacak ikinci taraf da yok.
+Çıktıyı dondurmanın anlamı: set sabit kalır, değişirse diff'te görünür. Üretilen
+dosya varsayılan olarak gitignore'dadır (`veri/*.json`, demo hariç) -- telifi
+belirsiz ya da özel veri kazara commit edilmesin.
+
+Yalnız çoktan seçmeli sorular aktarılır; bu depoda `noul` primitifi yok.
 """
 import argparse
 import json
@@ -16,12 +20,11 @@ import os
 import sys
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VARSAYILAN_KAYNAK = os.path.join(os.path.dirname(KOK), "jev-test")
 CIKTI = os.path.join(KOK, "veri", "benchmark_tr.json")
 
 
 def yukle(kaynak):
-    """jev-test/benchmark/veriseti.py'yi import edip SORULAR'ı döndürür."""
+    """<kaynak>/benchmark/veriseti.py'yi import edip SORULAR'ı döndürür."""
     benchmark = os.path.join(kaynak, "benchmark")
     if not os.path.isdir(benchmark):
         raise SystemExit("benchmark klasörü yok: %s\n--kaynak ile doğru yolu ver." % benchmark)
@@ -34,8 +37,8 @@ def yukle(kaynak):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Türkçe benchmark'ı JSON'a aktar")
-    ap.add_argument("--kaynak", default=VARSAYILAN_KAYNAK, help="jev-test deposunun kökü")
+    ap = argparse.ArgumentParser(description="Soru setini bu deponun şemasına çevir")
+    ap.add_argument("--kaynak", required=True, help="kaynak deponun kökü")
     ap.add_argument("--cikti", default=CIKTI)
     args = ap.parse_args()
 
@@ -57,7 +60,7 @@ def main():
         })
 
     paket = {
-        "kaynak": "jev-test/benchmark/veriseti.py",
+        "kaynak": args.kaynak,
         "not": ("Türkçe benchmark'ın Jev'e uyarlanmış hali. 'cevrildi' işaretli sorular "
                 "kaynakta açık uçluydu; çoktan seçmeliye dönüştürüldü, yani ölçülen şey "
                 "'üretebiliyor mu' değil 'doğrusunu ayırt edebiliyor mu'. İki grubu ayrı oku."),

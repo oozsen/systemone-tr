@@ -1,14 +1,21 @@
-"""Dondurulmuş Türkçe benchmark'ı okur (veri/benchmark_tr.json).
+"""Soru setini JSON'dan okur.
 
-Kaynak jev-test/benchmark/veriseti.py; kopyayı `araclar/veriseti_aktar.py` üretir.
-JSON'dan okumanın sebebi: bu proje jev-test olmadan da koşsun ve ölçüm sabit
-kalsın. Kaynak değişirse aktarma betiği yeniden çalıştırılır, diff'te görünür.
+Depoda yalnız `veri/demo_tr.json` var: on soruluk, sıfırdan yazılmış bir DEMO
+seti. Düzeneğin ayakta olduğunu gösterir, doğruluk ölçmez.
+
+**Kendi setini bağla.** Aynı şemada bir JSON yaz ve göster:
+
+    SYSTEMONE_VERISETI=/yol/benim_setim.json python web/sunucu.py
+
+Kendi benchmark'ın başka bir biçimdeyse `araclar/veriseti_aktar.py`'yi örnek al.
+Setler repoya girmek zorunda değil -- telifi belirsiz ya da özel veriyi dışarıda
+tutmak için `veri/*.json` (demo hariç) bilinçli olarak gitignore'da.
 """
 import json
 import os
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-YOL = os.path.join(KOK, "veri", "benchmark_tr.json")
+YOL = os.environ.get("SYSTEMONE_VERISETI") or os.path.join(KOK, "veri", "demo_tr.json")
 
 
 class Soru:
@@ -72,6 +79,8 @@ class VeriSeti:
 def yukle(yol=YOL):
     if not os.path.exists(yol):
         raise SystemExit(
-            "Veri seti yok: %s\nÜretmek için: python araclar/veriseti_aktar.py" % yol)
+            "Veri seti bulunamadı: %s\n"
+            "Depoyla gelen demo seti veri/demo_tr.json'dır; kendi setini "
+            "SYSTEMONE_VERISETI ile gösterebilirsin." % yol)
     with open(yol, encoding="utf-8") as f:
         return VeriSeti(json.load(f))

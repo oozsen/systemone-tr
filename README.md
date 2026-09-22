@@ -52,17 +52,34 @@ Anahtarı olmayan ya da servis edilmeyen kol devre dışı kalır, sayfa yine a�
 `--motor spark --motor gemma` ile baştan alt küme de seçilebilir (Jev'e para
 harcamadan koşmak için işe yarar).
 
-İki görünüm var: **tek soru** (iki dağılım aynı satırlarda hizalı) ve **tüm set**
-(19 sorunun tamamı; doğruluk, kalibrasyon, gecikme ve motorların ayrıştığı sorular).
+İki görünüm var: **tek soru** (dağılımlar aynı satırlarda hizalı) ve **tüm set**
+(setin tamamı; doğruluk, kalibrasyon, gecikme ve motorların ayrıştığı sorular).
 Aynı raporu terminalden almak için `python -m karsilastir.kosu`.
 
-Veri seti `jev-test/benchmark/veriseti.py`'den dondurulmuştur
-(`veri/benchmark_tr.json`, üreteci `araclar/veriseti_aktar.py`). Kaynak değişirse
-betik yeniden koşulur ve diff'te ne değiştiği görünür.
+### Soru seti
+
+Depoda **`veri/demo_tr.json`** var: on soruluk, bu depo için sıfırdan yazılmış bir
+demo seti. Düzeneğin ayakta olduğunu ve üç motorun yan yana okunabildiğini
+gösterir — **doğruluk ölçmez.**
+
+Kendi setinizi bağlamak için aynı şemada bir JSON yazıp gösterin:
+
+```bash
+SYSTEMONE_VERISETI=/yol/benim_setim.json python web/sunucu.py
+```
+
+Kendi benchmark'ınız başka biçimdeyse `araclar/veriseti_aktar.py` dönüştürme
+betiğine örnektir. `veri/*.json` (demo hariç) bilinçli olarak gitignore'da:
+telifi belirsiz ya da özel veri kazara commit edilmesin.
 
 ### Ölçülenler (22.09.2026, kol tr-q)
 
-19 soru; Jev `jev-1.13.0`, Qwen3.8-27B-FP8, Gemma4-26B:
+Aşağıdaki sayılar **paylaşılmayan özel bir 19 soruluk Türkçe sette** ölçüldü; o
+set telif durumu netleşmediği için depoya girmiyor. Yani bu tablo bu repodan
+birebir tekrarlanamaz — deponun demo seti on sorudur ve başka sorulardan oluşur.
+Sayılar yöntemin ne ürettiğini gösterir, bir kıyas ilanı değildir.
+
+Jev `jev-1.13.0`, Qwen3.8-27B-FP8, Gemma4-26B:
 
 | | Jev | Qwen | Gemma |
 |---|---|---|---|
@@ -138,7 +155,7 @@ Bu yalnız yöntemin ayakta olduğunu gösterir; asıl benchmark sayıları yuka
 | Güvenler | 0.980 – 0.993 |
 | Diakritiksiz Türkçe | doğru bildi, güven anlamlı şekilde düştü (0.898) |
 
-Referans: laya reposunun tablosunda Jev 710 ms/vaka.
+Referans: Laya'nın kendi tablosunda Jev 710 ms/vaka.
 
 ## Ölçülmeyenler
 
@@ -151,7 +168,7 @@ Bunlar bilinmiyor, tahmin edilmemeli:
   olarak okunamaz — 19 sorunun kaçı içerik, kaçı konum yüzünden doğru bilinmiyor.
 * **Gerçek doğruluk.** 19 soru bir ölçüm değildir: held-out bölünmüş değil, 12'si
   açık uçludan çoktan seçmeliye dönüştürülmüş, ve iki kategori tek soruyla temsil
-  ediliyor. Kapsam dışı bırakılanlar `veri/benchmark_tr.json` içinde listeli.
+  ediliyor. Bu set depoda yok (yukarıya bak).
 * **ECE.** Kalibrasyon şu an kaba kovalarla bakılıyor (`≥0.90 / 0.70–0.90 / <0.70`).
   Tek sayıya indirmek (ECE) daha büyük bir set ister.
 * **`score` / `noul` primitifleri.** Aynı okumanın üstüne kurulur ama ayrı doğrulama
@@ -173,20 +190,24 @@ Kalibrasyon artık tamamen bilinmeyen değil: 19 soruluk sette her iki motorda d
 
 ```
 systemone/        tipli karar okuması (transport / scorer / questions / config)
-karsilastir/      iki motor tek arayüz: motor.py, rapor.py, veriseti.py, kosu.py
+karsilastir/      motorlar tek arayüzde: motor.py, rapor.py, veriseti.py, kosu.py
 web/              sunucu.py + arayuz.html — yan yana karşılaştırma
-veri/             benchmark_tr.json (dondurulmuş veri seti)
-araclar/          veriseti_aktar.py — veri setini jev-test'ten yeniden üretir
+veri/             demo_tr.json — on soruluk demo seti (özgün, MIT)
+araclar/          veriseti_aktar.py — kendi setini bu şemaya çeviren örnek betik
 run_demo.py       departman duman testi
 ```
 
 ## Bağlam
 
 * [TheoLeeCJ/SemIf](https://github.com/TheoLeeCJ/SemIf) — yöntemin kaynağı (MIT)
-* `jev-test` (private) — Jev tarafının referansı ve Türkçe benchmark'ın kaynağı.
-  `veri/benchmark_tr.json` oradaki `benchmark/veriseti.py`'den dondurulmuştur;
-  `karsilastir/motor.py`'deki Jev gövdesi oradaki `jev.py` ile birebir aynıdır
-  (tek fark: `requests` yerine stdlib `urllib`).
+* [TypeSafe belgeleri](https://docs.typesafe.ai) — Jev'in istek/cevap sözleşmesi.
+  `karsilastir/motor.py`'deki Jev gövdesi bu sözleşmeye göre yazıldı; tek fark
+  resmî SDK yerine stdlib `urllib` kullanılması (bağımlılık eklememek için).
 * [vLLM engine args](https://docs.vllm.ai/en/stable/configuration/engine_args/) — `logprobs-mode`, `max-logprobs`
-* Laya (`../laya`) — alternatif yaklaşım: eğitilmiş 322M encoder. Türkçede 20 seçenekli
-  MASSIVE'de 0.370 / ECE 0.417. Bu proje onun yerine geçmiyor; karşılaştırma için duruyor.
+* Laya — alternatif yaklaşım: eğitilmiş 322M encoder (bu depoda değil, özel).
+  Türkçede 20 seçenekli MASSIVE'de 0.370 / ECE 0.417. Bu proje onun yerine
+  geçmiyor; karşılaştırma için anılıyor.
+
+## Lisans
+
+MIT — `LICENSE`. `veri/demo_tr.json` dahil deponun tamamı aynı lisans altındadır.

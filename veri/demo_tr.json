@@ -1,0 +1,169 @@
+{
+  "kaynak": "bu depo için sıfırdan yazıldı",
+  "not": "DEMO SETİ — BİR BENCHMARK DEĞİLDİR. On soru, düzeneğin ayakta olduğunu ve üç motorun yan yana okunabildiğini göstermek için var. Üçüncü taraf metni içermez, bu depoyla aynı lisans altındadır. Doğruluk ölçmek isteyen kendi setini bağlamalı: aynı şemada bir JSON yazıp SYSTEMONE_VERISETI ile göster, ya da araclar/veriseti_aktar.py ile kendi kaynağından üret.",
+  "kapsam_disi": {
+    "uretim_gorevleri": "Metin/kod üretmek isteyen sorular bu yöntemle ölçülemez: model cevap yazmaz, yalnız verilen şıklar arasından seçer.",
+    "acik_uclu": "Şıksız sorular da ölçülemez; şık üretmek ölçülen şeyi 'üretebiliyor mu'dan 'ayırt edebiliyor mu'ya çevirir."
+  },
+  "aktarilmayan": {},
+  "sorular": [
+    {
+      "id": "destek_fatura",
+      "kategori": "Destek",
+      "durum": "Merhaba, Mart ayı için kartımdan iki kez tahsilat yapılmış. Fazla çekilen tutarın iade edilmesini istiyorum.",
+      "talimat_tr": "Bu destek talebi hangi departmanı ilgilendirir?",
+      "talimat_en": "Which department should handle this support request?",
+      "secenekler": {
+        "faturalama": "faturalar, ödemeler, iadeler",
+        "teknik": "hatalar, kesintiler, sistem sorunları",
+        "satış": "fiyatlandırma, yeni sözleşmeler",
+        "diğer": "diğer her şey"
+      },
+      "dogru": "faturalama",
+      "donusum": "aynen",
+      "not": "Açık vaka. Güvenin yüksek çıkması beklenir."
+    },
+    {
+      "id": "destek_teknik",
+      "kategori": "Destek",
+      "durum": "Uygulama her açılışta kapanıyor. Telefonu yeniden başlattım, uygulamayı silip kurdum, değişen bir şey olmadı.",
+      "talimat_tr": "Bu destek talebi hangi departmanı ilgilendirir?",
+      "talimat_en": "Which department should handle this support request?",
+      "secenekler": {
+        "faturalama": "faturalar, ödemeler, iadeler",
+        "teknik": "hatalar, kesintiler, sistem sorunları",
+        "satış": "fiyatlandırma, yeni sözleşmeler",
+        "diğer": "diğer her şey"
+      },
+      "dogru": "teknik",
+      "donusum": "aynen",
+      "not": "Açık vaka."
+    },
+    {
+      "id": "destek_karisik",
+      "kategori": "Destek",
+      "durum": "Faturamdan iki kez çekim yapılmış. Ödeme ekranı da hata veriyor ama asıl derdim paramın iadesi, onu bir an önce halledin.",
+      "talimat_tr": "Bu destek talebi hangi departmanı ilgilendirir?",
+      "talimat_en": "Which department should handle this support request?",
+      "secenekler": {
+        "faturalama": "faturalar, ödemeler, iadeler",
+        "teknik": "hatalar, kesintiler, sistem sorunları",
+        "satış": "fiyatlandırma, yeni sözleşmeler",
+        "diğer": "diğer her şey"
+      },
+      "dogru": "faturalama",
+      "donusum": "aynen",
+      "not": "Kasıtlı olarak iki sinyal içeriyor ama metin asıl derdi açıkça söylüyor. Temiz vakalara göre daha düşük güven beklenir -- dağılımın şeklini görmek için buradadır."
+    },
+    {
+      "id": "destek_diakritiksiz",
+      "kategori": "Destek",
+      "durum": "Sisteme giris yapamiyorum, sifremi sifirladim ama sifirlama e-postasi hic gelmedi.",
+      "talimat_tr": "Bu destek talebi hangi departmanı ilgilendirir?",
+      "talimat_en": "Which department should handle this support request?",
+      "secenekler": {
+        "faturalama": "faturalar, ödemeler, iadeler",
+        "teknik": "hatalar, kesintiler, sistem sorunları",
+        "satış": "fiyatlandırma, yeni sözleşmeler",
+        "diğer": "diğer her şey"
+      },
+      "dogru": "teknik",
+      "donusum": "aynen",
+      "not": "Diakritiksiz yazım. İçerik kolay, zorluk yalnız imlada -- güvendeki düşüş doğrudan bu etkiyi ölçer."
+    },
+    {
+      "id": "aciliyet_yuksek",
+      "kategori": "Aciliyet",
+      "durum": "Yarın sabah müşteriye sunum yapacağız ve raporlama ekranı hiç açılmıyor. Sunumu erteleyemiyoruz.",
+      "talimat_tr": "Bu talebin aciliyeti ne kadar?",
+      "talimat_en": "How urgent is this request?",
+      "secenekler": {
+        "düşük": "acil değil, beklemeye tahammülü var",
+        "orta": "yakın zamanda ilgilenilmeli",
+        "yüksek": "kritik son tarih veya engelleyici sorun"
+      },
+      "dogru": "yüksek",
+      "donusum": "aynen",
+      "not": "Hem son tarih hem engelleyici sorun var."
+    },
+    {
+      "id": "aciliyet_dusuk",
+      "kategori": "Aciliyet",
+      "durum": "Profil sayfasındaki doğum tarihi alanı gün/ay sırasını ters gösteriyor. Acelesi yok, aklımda kalsın diye yazıyorum.",
+      "talimat_tr": "Bu talebin aciliyeti ne kadar?",
+      "talimat_en": "How urgent is this request?",
+      "secenekler": {
+        "düşük": "acil değil, beklemeye tahammülü var",
+        "orta": "yakın zamanda ilgilenilmeli",
+        "yüksek": "kritik son tarih veya engelleyici sorun"
+      },
+      "dogru": "düşük",
+      "donusum": "aynen",
+      "not": "Kullanıcı aciliyetsizliği kendisi söylüyor."
+    },
+    {
+      "id": "tr_esanlam",
+      "kategori": "Türkçe",
+      "durum": "Ekip lideri, teslim tarihi yaklaşmasına rağmen raporu savsakladı.",
+      "talimat_tr": "`state` içindeki cümlede geçen 'savsakladı' sözcüğünün anlamca en yakın karşılığı hangisidir?",
+      "talimat_en": "Which option is closest in meaning to the word 'savsakladı' in the sentence in `state`?",
+      "secenekler": {
+        "ihmal etti": "",
+        "hızlandırdı": "",
+        "devretti": "",
+        "tamamladı": ""
+      },
+      "dogru": "ihmal etti",
+      "donusum": "aynen",
+      "not": ""
+    },
+    {
+      "id": "tr_yazim",
+      "kategori": "Türkçe",
+      "durum": "Aşağıdaki sözcüklerden yalnız biri Türkçe yazım kurallarına uygundur.",
+      "talimat_tr": "Hangi sözcük doğru yazılmıştır?",
+      "talimat_en": "Which word is spelled correctly in Turkish?",
+      "secenekler": {
+        "herkes": "",
+        "herkez": "",
+        "yalnış": "",
+        "yanlız": ""
+      },
+      "dogru": "herkes",
+      "donusum": "aynen",
+      "not": "Doğru yazım 'herkes', 'yanlış' ve 'yalnız'. Şıklardaki üç biçim de yaygın yanlışlardır."
+    },
+    {
+      "id": "mantik_kalem",
+      "kategori": "Mantık",
+      "durum": "Bir kutuda 24 kalem var. Kalemlerin üçte biri kırmızı. Kalanların yarısı mavi, geri kalanların hepsi siyah.",
+      "talimat_tr": "Kutuda kaç siyah kalem vardır?",
+      "talimat_en": "How many black pencils are in the box?",
+      "secenekler": {
+        "8": "",
+        "4": "",
+        "12": "",
+        "16": ""
+      },
+      "dogru": "8",
+      "donusum": "aynen",
+      "not": "24/3 = 8 kırmızı; kalan 16'nın yarısı 8 mavi; geriye 8 siyah kalır."
+    },
+    {
+      "id": "mantik_boy",
+      "kategori": "Mantık",
+      "durum": "Ali, Veli'den uzundur. Veli, Can'dan uzundur. Can da Deniz'den uzundur.",
+      "talimat_tr": "Dördü arasında en kısa olan kimdir?",
+      "talimat_en": "Who is the shortest of the four?",
+      "secenekler": {
+        "Deniz": "",
+        "Can": "",
+        "Veli": "",
+        "Ali": ""
+      },
+      "dogru": "Deniz",
+      "donusum": "aynen",
+      "not": "Ali > Veli > Can > Deniz."
+    }
+  ]
+}

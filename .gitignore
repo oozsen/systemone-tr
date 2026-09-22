@@ -13,3 +13,9 @@ venv/
 
 # Ölçüm çıktıları (ham sonuçlar repoya bilinçli olarak eklenir, geçici olanlar değil)
 *.tmp.jsonl
+
+# Soru setleri. Depoya YALNIZ demo_tr.json girer -- o sıfırdan yazıldı ve
+# üçüncü taraf metni içermiyor. Kendi setin telifi belirsiz kaynaklardan
+# derlenmiş ya da özel veri içeriyor olabilir; varsayılan olarak dışarıda kalsın.
+veri/*.json
+!veri/demo_tr.json
