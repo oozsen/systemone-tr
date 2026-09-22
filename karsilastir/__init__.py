@@ -4,7 +4,7 @@
 
     vs = veriseti.yukle()
     j = JevMotoru(api_key="...")
-    s = SparkMotoru("http://10.10.104.33:4000/v1", "sk-...", "qwen3.8-27b")
+    s = SparkMotoru("http://SPARK_IP:4000/v1", "sk-...", "qwen3.8-27b")
 
     soru = vs.bul("tr_kavram")
     for m in (j, s):

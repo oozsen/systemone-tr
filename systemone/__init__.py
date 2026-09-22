@@ -4,7 +4,7 @@ Model cevabı üretmez; üretmeden önce seçeneklerin logit'leri okunur.
 
     from systemone import LiteLLMTransport, questions, score
 
-    t = LiteLLMTransport("http://10.10.104.33:4000/v1", api_key="sk-...")
+    t = LiteLLMTransport("http://SPARK_IP:4000/v1", api_key="sk-...")
     d = score(t, "qwen3.8-27b", "Faturamda iki kez ücret alınmış.", questions.departman())
     d.label, d.confidence        # -> ('faturalama', 0.993)
 """

@@ -206,7 +206,12 @@ class SparkMotoru:
     def __init__(self, base_url, api_key, model, ad="spark", timeout=60.0):
         self.ad = ad
         self.model = model
-        self.transport = LiteLLMTransport(base_url, api_key, timeout=timeout)
+        try:
+            self.transport = LiteLLMTransport(base_url, api_key, timeout=timeout)
+        except TransportError as e:
+            # Kurulum hatası da motor hatasıdır: çağıran taraf tek tip yakalar
+            # ve o kolu devre dışı bırakıp diğerleriyle devam eder.
+            raise MotorHatasi(str(e))
 
     def __repr__(self):
         return "SparkMotoru(%s, %s)" % (self.ad, self.model)

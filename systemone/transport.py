@@ -18,7 +18,17 @@ class TransportError(RuntimeError):
 class LiteLLMTransport:
     """LiteLLM ağ geçidi üzerinden (LAN'dan erişilebilir, sanal anahtar ister)."""
 
+    # .env.example'daki yer tutucu. Doldurulmadan gelirse DNS hatasıyla değil,
+    # ne yapılması gerektiğini söyleyen bir mesajla düşsün.
+    YER_TUTUCU = "SPARK_IP"
+
     def __init__(self, base_url, api_key=None, timeout=120.0):
+        if not base_url or self.YER_TUTUCU in base_url:
+            raise TransportError(
+                "SYSTEMONE_BASE_URL ayarlanmamış (şu an: %r).\n"
+                "`.env` dosyasında SPARK_IP yerine vLLM/LiteLLM sunucunun "
+                "adresini yaz, ör. http://192.168.1.50:4000/v1" % (base_url,)
+            )
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout

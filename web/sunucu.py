@@ -57,8 +57,11 @@ def motorlari_kur(cfg, istenen):
             ACILIS_NOTU.append(
                 "%s devre dışı — SYSTEMONE_API_KEY yok (.env: %s)" % (ad, cfg["env_path"]))
             continue
-        motorlar[ad] = SparkMotoru(
-            cfg["base_url"], cfg["api_key"], cfg[model_anahtari], ad=ad)
+        try:
+            motorlar[ad] = SparkMotoru(
+                cfg["base_url"], cfg["api_key"], cfg[model_anahtari], ad=ad)
+        except MotorHatasi as e:
+            ACILIS_NOTU.append("%s devre dışı — %s" % (ad, e))
 
     return motorlar
 

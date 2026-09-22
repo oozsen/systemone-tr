@@ -10,7 +10,9 @@ Böylece CI'da ortam değişkeni, geliştirmede .env çalışır ve ikisi çakı
 import os
 
 DEFAULTS = {
-    "SYSTEMONE_BASE_URL": "http://10.10.104.33:4000/v1",
+    # Yer tutucu. Gerçek adres .env'den gelir; doldurulmazsa transport
+    # katmanı bunu fark edip anlaşılır bir hata verir (bkz. transport.py).
+    "SYSTEMONE_BASE_URL": "http://SPARK_IP:4000/v1",
     "SYSTEMONE_MODEL": "qwen3.8-27b",
     "SYSTEMONE_CONTAINER": "vllm",
     # Aynı ağ geçidinde servis edilen ikinci model. Karşılaştırmanın üçüncü kolu.

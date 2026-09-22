@@ -58,7 +58,13 @@ def main():
                   "SYSTEMONE_API_KEY satırını doldur. Aranan yol: %s" % cfg["env_path"],
                   file=sys.stderr)
             return 2
-        transport = LiteLLMTransport(args.base_url, args.api_key, timeout=args.timeout)
+        try:
+            transport = LiteLLMTransport(args.base_url, args.api_key, timeout=args.timeout)
+        except TransportError as e:
+            # Adres yer tutucu olarak kaldıysa burada yakalanır; yığın izi yerine
+            # ne yapılması gerektiğini söyleyen mesaj bassın.
+            print("\nHATA: %s" % e, file=sys.stderr)
+            return 2
 
     question = questions.departman()
     print("model=%s  taşıyıcı=%r" % (args.model, transport))
