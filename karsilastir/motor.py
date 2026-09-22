@@ -38,7 +38,8 @@ class Karar:
     """Tek bir motorun tek bir soruya verdiği cevap."""
 
     def __init__(self, motor, etiket, olasiliklar, guven, gecikme_ms,
-                 maliyet=None, maliyet_tahmini=False, model=None, notlar=()):
+                 maliyet=None, maliyet_tahmini=False, model=None, notlar=(),
+                 pencerede=None):
         self.motor = motor
         self.etiket = etiket
         self.olasiliklar = olasiliklar      # {şık: olasılık}, toplamı 1
@@ -48,6 +49,11 @@ class Karar:
         self.maliyet_tahmini = maliyet_tahmini
         self.model = model
         self.notlar = list(notlar)          # okuma hakkında uyarılar
+        # Kaç şık top-N penceresinde GERÇEKTEN görüldü. Logit okumasında bu
+        # sayı 2'nin altına düşerse güven ölçülmüş değildir: rakipler pencereye
+        # girmediği için entropi neredeyse sıfır çıkar ve güven 1.0'a yapışır.
+        # Jev'de her zaman tüm şıklar döner, orada None (konu dışı).
+        self.pencerede = pencerede
 
     def __repr__(self):
         return "Karar(%s, %r, guven=%.3f, %.0fms)" % (
@@ -64,7 +70,18 @@ class Karar:
             "maliyet_tahmini": self.maliyet_tahmini,
             "model": self.model,
             "notlar": self.notlar,
+            "pencerede": self.pencerede,
         }
+
+    @property
+    def guven_olculdu(self):
+        """Güven gerçekten ölçüldü mü, yoksa pencere darlığının ürünü mü?
+
+        En az iki şık pencerede görülmediyse dağılım karşılaştırma içermez:
+        güven yüksek çıkar ama bu 'model emin' değil, 'rakipleri göremedik'
+        demektir.
+        """
+        return self.pencerede is None or self.pencerede >= 2
 
 
 # --------------------------------------------------------------------------- Jev
@@ -180,16 +197,19 @@ class SparkMotoru:
         değiştirebilir. Jev'de şıklar adlarıyla gider, sıra etkisi yoktur.
         `karar(..., ters=True)` aynı soruyu ters sırayla sorar; iki okuma
         ayrışıyorsa okunan şey içerik değil konumdur.
+
+    Aynı ağ geçidinde birden çok model servis ediliyor (qwen3.8-27b, gemma4-26b);
+    `ad` bu yüzden parametre: her model kendi motoru olarak görünür ve sonuçlar
+    ayrı sütunlarda toplanır.
     """
 
-    ad = "spark"
-
-    def __init__(self, base_url, api_key, model, timeout=60.0):
+    def __init__(self, base_url, api_key, model, ad="spark", timeout=60.0):
+        self.ad = ad
         self.model = model
         self.transport = LiteLLMTransport(base_url, api_key, timeout=timeout)
 
     def __repr__(self):
-        return "SparkMotoru(%s)" % self.model
+        return "SparkMotoru(%s, %s)" % (self.ad, self.model)
 
     def karar(self, durum, talimat, secenekler, ters=False):
         if len(secenekler) > len(LETTERS):
@@ -202,19 +222,26 @@ class SparkMotoru:
         try:
             d = score(self.transport, self.model, durum, soru)
         except TransportError as e:
-            raise MotorHatasi("Spark: %s" % e)
+            raise MotorHatasi("%s: %s" % (self.ad, e))
 
+        pencerede = len(secenekler) - len(d.missing)
         notlar = []
         if d.missing:
             notlar.append("top-20 penceresinde yoktu, kesim değeriyle dolduruldu: "
                           + ", ".join(d.missing))
+        if pencerede < 2:
+            # Tek şık görüldüyse karşılaştırma yapılmamıştır. Güven yine de
+            # yüksek çıkar -- ama "model emin" değil, "rakipleri göremedik".
+            notlar.append("pencerede yalnız 1 şık göründü; güven ÖLÇÜLMÜŞ DEĞİL, "
+                          "pencere darlığının ürünü. Sıralama geçerli, güven değil.")
 
         # Jev tüm şıkları döndürür; aynı anahtar kümesini garanti edelim ki
-        # arayüzde iki dağılım aynı satırlarda hizalansın.
+        # arayüzde dağılımlar aynı satırlarda hizalansın.
         olasiliklar = {ad: d.probabilities.get(ad, 0.0) for ad in secenekler}
 
         return Karar(
             motor=self.ad, etiket=d.label, olasiliklar=olasiliklar,
             guven=d.confidence, gecikme_ms=d.latency_ms,
             maliyet=None, model=self.model, notlar=notlar,
+            pencerede=pencerede,
         )

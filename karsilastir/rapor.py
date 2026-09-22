@@ -12,7 +12,7 @@ görünen sayı ile terminalde görünen sayı aynı koddan gelir.
    bir motordan daha kullanışlıdır.
 3. Gecikme / maliyet.
 
-İki motorun güven sayıları AYNI ŞEY DEĞİLDİR (bkz. motor.py). Bu yüzden burada
+Motorların güven sayıları AYNI ŞEY DEĞİLDİR (bkz. motor.py). Bu yüzden burada
 hiçbir yerde "Jev'in güveni Spark'ınkinden yüksek" gibi bir kıyas yapılmaz;
 her motorun güveni yalnız kendi içinde, doğruyu yanlıştan ayırma gücü olarak
 değerlendirilir.
@@ -55,10 +55,15 @@ def ozet(sonuclar):
         return {"n": 0}
     gecikmeler = [s.karar.gecikme_ms for s in sonuclar]
     maliyetli = [s.karar.maliyet for s in sonuclar if s.karar.maliyet is not None]
+    # Güveni pencere darlığı yüzünden okunamayan yargılar. Bu sayı toplama
+    # yaklaştıkça kalibrasyon tablosu anlamını yitirir: kovalar dolu görünür
+    # ama içindeki güven "model emin" değil "rakipleri göremedik" demektir.
+    olculmeyen = sum(1 for s in sonuclar if not s.karar.guven_olculdu)
     return {
         "n": len(sonuclar),
         "dogru": sum(s.dogru for s in sonuclar),
         "oran": _oran(sonuclar),
+        "guven_olculmeyen": olculmeyen,
         "gecikme_medyan": statistics.median(gecikmeler),
         "gecikme_max": max(gecikmeler),
         # None = ölçülmüyor (Spark kendi donanımımızda; marjinal ücreti yok).
@@ -112,8 +117,12 @@ def kalibrasyon(motor_sonuclari):
         yanlislar = [s.karar.guven for s in sonuclar if not s.dogru]
         od = statistics.mean(dogrular) if dogrular else None
         oy = statistics.mean(yanlislar) if yanlislar else None
+        olculmeyen = sum(1 for s in sonuclar if not s.karar.guven_olculdu)
         ayrisma[motor] = {
             "dogruda": od, "yanlista": oy,
+            # Satırın okunup okunamayacağını belirler; arayüz buna göre uyarır.
+            "guven_olculmeyen": olculmeyen,
+            "guven_okunabilir": olculmeyen < len(sonuclar) / 2 if sonuclar else False,
             # Fark ne kadar büyükse güven eşiği o kadar işe yarar. Sıfıra yakınsa
             # eşikleme çalışmaz: her kararın insana sorulması gerekir.
             "fark": (od - oy) if (od is not None and oy is not None) else None,
@@ -123,9 +132,9 @@ def kalibrasyon(motor_sonuclari):
 
 
 def anlasmazlik(motor_sonuclari):
-    """İki motorun ayrıştığı sorular -- bakılmaya en değer olanlar.
+    """Motorların ayrıştığı sorular -- bakılmaya en değer olanlar.
 
-    Aynı soruya farklı cevap veren iki motor, ikisinin de ortalama doğruluğundan
+    Aynı soruya farklı cevap veren motorlar, hepsinin ortalama doğruluğundan
     daha fazla şey söyler: hangi soru türünün gerçekten ayırt edici olduğunu
     gösterir.
     """

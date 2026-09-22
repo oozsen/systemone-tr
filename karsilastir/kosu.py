@@ -1,8 +1,8 @@
-"""Türkçe benchmark'ı iki motorda koşturup terminale raporlar.
+"""Türkçe benchmark'ı üç motorda koşturup terminale raporlar.
 
-    python -m karsilastir.kosu                  # iki motor, kol tr-q
+    python -m karsilastir.kosu                  # jev + qwen + gemma, kol tr-q
     python -m karsilastir.kosu --kol en-q       # talimatlar İngilizce
-    python -m karsilastir.kosu --motor spark    # tek kol
+    python -m karsilastir.kosu --motor spark --motor gemma   # Jev'i atla
     python -m karsilastir.kosu --jsonl cikti.jsonl
 
 Web arayüzüyle (`web/sunucu.py`) aynı `rapor` fonksiyonlarını çağırır; iki yerde
@@ -21,7 +21,11 @@ from systemone import load_config
 from . import rapor, veriseti
 from .motor import JevMotoru, MotorHatasi, SparkMotoru
 
-ETIKET = {"jev": "Jev (typesafe.ai)", "spark": "Spark (vLLM)"}
+ETIKET = {"jev": "Jev (typesafe.ai)", "spark": "Spark / Qwen", "gemma": "Spark / Gemma"}
+# Tablo başlıkları için: iki Spark kolu da "Spark" diye görünmesin.
+KISA = {"jev": "Jev", "spark": "Qwen", "gemma": "Gemma"}
+# Spark kolları aynı ağ geçidini, farklı modelleri kullanır.
+SPARK_MODELLERI = {"spark": "model", "gemma": "gemma_model"}
 
 
 def motorlari_kur(cfg, istenen):
@@ -33,7 +37,8 @@ def motorlari_kur(cfg, istenen):
             else:
                 if not cfg["api_key"]:
                     raise MotorHatasi("SYSTEMONE_API_KEY yok (.env: %s)" % cfg["env_path"])
-                motorlar["spark"] = SparkMotoru(cfg["base_url"], cfg["api_key"], cfg["model"])
+                motorlar[ad] = SparkMotoru(
+                    cfg["base_url"], cfg["api_key"], cfg[SPARK_MODELLERI[ad]], ad=ad)
         except MotorHatasi as e:
             print("  ! %s devre dışı — %s" % (ad, e))
     return motorlar
@@ -47,7 +52,7 @@ def _hucre(h):
 
 def _tablo(baslik, birinci_sutun, satirlar, motorlar, anahtar):
     print("\n%s" % baslik)
-    print("  %-22s" % "" + "".join("%14s" % ETIKET.get(m, m).split(" ")[0] for m in motorlar))
+    print("  %-22s" % "" + "".join("%14s" % KISA.get(m, m) for m in motorlar))
     print("  " + "-" * (22 + 14 * len(motorlar)))
     for s in satirlar:
         print("  %-22s" % s[birinci_sutun][:22]
@@ -57,7 +62,7 @@ def _tablo(baslik, birinci_sutun, satirlar, motorlar, anahtar):
 def main():
     ap = argparse.ArgumentParser(description="Jev / Spark karşılaştırmalı koşum")
     ap.add_argument("--kol", default="tr-q", choices=["tr-q", "en-q"])
-    ap.add_argument("--motor", action="append", choices=["jev", "spark"])
+    ap.add_argument("--motor", action="append", choices=["jev", "spark", "gemma"])
     ap.add_argument("--jsonl", help="her yargıyı bu dosyaya da yaz")
     args = ap.parse_args()
 
@@ -69,7 +74,7 @@ def main():
                 pass
 
     vs = veriseti.yukle()
-    motorlar = motorlari_kur(load_config(), args.motor or ["jev", "spark"])
+    motorlar = motorlari_kur(load_config(), args.motor or ["jev", "spark", "gemma"])
     if not motorlar:
         print("\nHiçbir motor kurulamadı.")
         return 2
@@ -134,9 +139,15 @@ def main():
         else:
             print("  %-18s ortalama güven — doğrularda %.2f, yanlışlarda %.2f  (fark %+.3f)"
                   % (ETIKET.get(m, m), a["dogruda"], a["yanlista"], a["fark"]))
+        if a["guven_olculmeyen"]:
+            print("  %-18s ! %d/%d yargıda rakip şıklar top-20 penceresine hiç girmedi."
+                  % ("", a["guven_olculmeyen"], r["ozet"][m]["n"]))
+            print("  %-18s   O satırlarda güven ÖLÇÜLMÜŞ DEĞİL; yukarıdaki kovalar"
+                  % "")
+            print("  %-18s   bu motor için okunamaz. Sıralama/doğruluk geçerli." % "")
     print("\n  Fark ne kadar büyükse güven eşiği o kadar işe yarar. Sıfıra yakınsa")
     print("  eşikleme çalışmaz ve her kararın insana sorulması gerekir.")
-    print("  İki motorun güven sayıları AYNI ŞEY DEĞİLDİR; her biri yalnız kendi")
+    print("  Motorların güven sayıları AYNI ŞEY DEĞİLDİR; her biri yalnız kendi")
     print("  içinde okunur (bkz. karsilastir/motor.py).")
 
     if r["anlasmazlik"]:

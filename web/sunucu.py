@@ -1,20 +1,20 @@
-"""Jev ile Spark'ı tarayıcıdan yan yana koşturur.
+"""Jev, Qwen ve Gemma'yı tarayıcıdan yan yana koşturur.
 
     python web/sunucu.py                 # http://127.0.0.1:8100
     python web/sunucu.py --port 9000
-    python web/sunucu.py --motor spark   # tek kol (anahtar yoksa da çalışsın)
+    python web/sunucu.py --motor spark --motor gemma   # Jev'i atla
 
 İki şey yapar:
 
-  Tek soru   Benchmark'tan bir soru seç (ya da kendin yaz), iki motora aynı anda
-             sor, iki dağılımı aynı satırlarda hizalı gör.
-  Tüm set    19 sorunun tamamını iki motorda koştur; doğruluk, kalibrasyon,
+  Tek soru   Benchmark'tan bir soru seç (ya da kendin yaz), motorlara aynı anda
+             sor, dağılımları aynı satırlarda hizalı gör.
+  Tüm set    19 sorunun tamamını her motorda koştur; doğruluk, kalibrasyon,
              gecikme ve ayrıştıkları sorular tek tabloda.
 
 API anahtarları sunucuda kalır, tarayıcıya hiçbir zaman gönderilmez.
 
-Yalnız standart kütüphane. İki motor `ThreadPoolExecutor` ile paralel çağrılır --
-toplam gecikme yavaş olanınki kadar, toplamı kadar değil.
+Yalnız standart kütüphane. Motorlar `ThreadPoolExecutor` ile paralel çağrılır --
+toplam gecikme en yavaşınki kadar, toplamı kadar değil.
 """
 import argparse
 import json
@@ -49,13 +49,16 @@ def motorlari_kur(cfg, istenen):
         except MotorHatasi as e:
             ACILIS_NOTU.append("jev devre dışı — %s" % e)
 
-    if "spark" in istenen:
+    # Spark kolları aynı ağ geçidini, farklı modelleri kullanır.
+    for ad, model_anahtari in (("spark", "model"), ("gemma", "gemma_model")):
+        if ad not in istenen:
+            continue
         if not cfg["api_key"]:
             ACILIS_NOTU.append(
-                "spark devre dışı — SYSTEMONE_API_KEY yok (.env: %s)" % cfg["env_path"])
-        else:
-            motorlar["spark"] = SparkMotoru(
-                cfg["base_url"], cfg["api_key"], cfg["model"])
+                "%s devre dışı — SYSTEMONE_API_KEY yok (.env: %s)" % (ad, cfg["env_path"]))
+            continue
+        motorlar[ad] = SparkMotoru(
+            cfg["base_url"], cfg["api_key"], cfg[model_anahtari], ad=ad)
 
     return motorlar
 
@@ -104,9 +107,9 @@ def sor(govde):
 def tum_seti_kos(govde):
     """19 sorunun tamamını seçili motorlarda koşturup raporlar.
 
-    Sorular sırayla, motorlar paralel gider: aynı soruyu iki motor aynı anda
-    görür, ama bir sonraki soruya geçilmeden önce ikisi de biter. Böylece
-    gecikme ölçümü sıraya girmiş isteklerden etkilenmez.
+    Sorular sırayla, motorlar paralel gider: aynı soruyu tüm motorlar aynı anda
+    görür, ama bir sonraki soruya geçilmeden önce hepsi biter. Böylece gecikme
+    ölçümü sıraya girmiş isteklerden etkilenmez.
     """
     kol = govde.get("kol") or "tr-q"
     if kol not in ("tr-q", "en-q"):
@@ -151,7 +154,8 @@ def acilis():
     return {
         "motorlar": [
             {"ad": m, "etiket": {"jev": "Jev (typesafe.ai)",
-                                 "spark": "Spark (vLLM)"}.get(m, m),
+                                 "spark": "Spark / Qwen",
+                                 "gemma": "Spark / Gemma"}.get(m, m),
              "model": getattr(MOTORLAR[m], "model", "")}
             for m in MOTORLAR
         ],
@@ -228,8 +232,8 @@ def main():
     ap = argparse.ArgumentParser(description="Jev / Spark karşılaştırma arayüzü")
     ap.add_argument("--port", type=int, default=8100)
     ap.add_argument("--adres", default="127.0.0.1")
-    ap.add_argument("--motor", action="append", choices=["jev", "spark"],
-                    help="yalnız bu motor(lar); tekrarlanabilir. Varsayılan: ikisi de")
+    ap.add_argument("--motor", action="append", choices=["jev", "spark", "gemma"],
+                    help="yalnız bu motor(lar); tekrarlanabilir. Varsayılan: hepsi")
     args = ap.parse_args()
 
     for akis in (sys.stdout, sys.stderr):
@@ -240,7 +244,7 @@ def main():
                 pass
 
     VERI = veriseti.yukle()
-    MOTORLAR = motorlari_kur(load_config(), args.motor or ["jev", "spark"])
+    MOTORLAR = motorlari_kur(load_config(), args.motor or ["jev", "spark", "gemma"])
 
     print("%d soru yüklendi (%s)" % (len(VERI), VERI.kaynak))
     for ad, m in MOTORLAR.items():

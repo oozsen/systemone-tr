@@ -13,6 +13,8 @@ DEFAULTS = {
     "SYSTEMONE_BASE_URL": "http://10.10.104.33:4000/v1",
     "SYSTEMONE_MODEL": "qwen3.8-27b",
     "SYSTEMONE_CONTAINER": "vllm",
+    # Aynı ağ geçidinde servis edilen ikinci model. Karşılaştırmanın üçüncü kolu.
+    "SYSTEMONE_GEMMA_MODEL": "gemma4-26b",
     "JEV_MODEL": "jev-latest",
 }
 
@@ -56,6 +58,7 @@ def load(env_path=None):
         "base_url": get("SYSTEMONE_BASE_URL", DEFAULTS["SYSTEMONE_BASE_URL"]),
         "model": get("SYSTEMONE_MODEL", DEFAULTS["SYSTEMONE_MODEL"]),
         "container": get("SYSTEMONE_CONTAINER", DEFAULTS["SYSTEMONE_CONTAINER"]),
+        "gemma_model": get("SYSTEMONE_GEMMA_MODEL", DEFAULTS["SYSTEMONE_GEMMA_MODEL"]),
         # Karşılaştırmanın Jev kolu. Yoksa None; çağıran taraf tek kolla devam eder.
         "typesafe_api_key": get("TYPESAFE_API_KEY"),
         "jev_model": get("JEV_MODEL", DEFAULTS["JEV_MODEL"]),

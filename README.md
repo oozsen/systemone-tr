@@ -32,17 +32,25 @@ python run_demo.py --docker
 
 ## Karşılaştırmalı arayüz
 
-Aynı Türkçe benchmark sorusunu iki motora birden sorar ve iki dağılımı yan yana
-gösterir: **Jev** (typesafe.ai — tipli cevabı API döndürür) ve **Spark** (DGX
-Spark'taki vLLM — cevap yazılmadan logit okunur).
+Aynı Türkçe benchmark sorusunu üç motora birden sorar ve dağılımları yan yana
+gösterir:
+
+| kol | nedir | nasıl okunur |
+|---|---|---|
+| `jev` | typesafe.ai System One | tipli cevabı API döndürür |
+| `spark` | DGX Spark / Qwen3.8-27B-FP8 | cevap yazılmadan logit okunur |
+| `gemma` | DGX Spark / Gemma4-26B | cevap yazılmadan logit okunur |
+
+İki Spark kolu aynı LiteLLM ağ geçidini, farklı modelleri kullanır.
 
 ```bash
 cp .env.example .env     # SYSTEMONE_API_KEY + TYPESAFE_API_KEY doldur
 python web/sunucu.py     # http://127.0.0.1:8100
 ```
 
-Anahtarlardan biri yoksa o motor devre dışı kalır, sayfa yine açılır
-(`--motor spark` ile baştan tek kol da seçilebilir).
+Anahtarı olmayan ya da servis edilmeyen kol devre dışı kalır, sayfa yine açılır.
+`--motor spark --motor gemma` ile baştan alt küme de seçilebilir (Jev'e para
+harcamadan koşmak için işe yarar).
 
 İki görünüm var: **tek soru** (iki dağılım aynı satırlarda hizalı) ve **tüm set**
 (19 sorunun tamamı; doğruluk, kalibrasyon, gecikme ve motorların ayrıştığı sorular).
@@ -54,32 +62,42 @@ betik yeniden koşulur ve diff'te ne değiştiği görünür.
 
 ### Ölçülenler (22.09.2026, kol tr-q)
 
-19 soru, Jev `jev-1.13.0` ve Qwen3.8-27B-FP8:
+19 soru; Jev `jev-1.13.0`, Qwen3.8-27B-FP8, Gemma4-26B:
 
-| | Jev | Spark |
-|---|---|---|
-| Doğruluk | 16/19 (%84,2) | 17/19 (%89,5) |
-| Gecikme (medyan) | 747 ms | 218 ms |
-| Ücret | ~$0,0004 (token'dan hesaplandı) | ölçülmüyor |
-| Güven farkı (doğrularda − yanlışlarda) | +0,481 | +0,701 |
+| | Jev | Qwen | Gemma |
+|---|---|---|---|
+| Doğruluk | 16/19 (%84,2) | **17/19 (%89,5)** | 16/19 (%84,2) |
+| Gecikme (medyan) | 720 ms | 313 ms | **203 ms** |
+| Ücret | ~$0,0004 (token'dan) | ölçülmüyor | ölçülmüyor |
+| Güven farkı (doğrularda − yanlışlarda) | +0,410 | **+0,701** | +0,270 |
+| Güveni ≥ 0,90 olan yargı | 9/19 (%47) | 10/19 (%53) | 17/19 (%89) |
 
-Art arda iki koşumda doğruluk aynı çıktı (16/19 ve 17/19); gecikme ve güven farkı
-son hanede oynadı (Jev +0,481 / +0,474). Sayılar tek koşumdan, sabit değil.
+Üç motor da aynı yerde zorlanıyor: Finans ve `mantik_otobus`. Ayrıştıkları tek
+soru `finans_gelismis` — orada yalnız Qwen doğru bildi.
 
-Fark ne kadar büyükse güven eşiği o kadar işe yarar. **İkisinde de eşikleme
-çalışıyor:** her iki motorda da `güven ≥ 0.90` kovasında hata yok (Jev 9/9,
-Spark 10/10), hatalar `< 0.70` kovasında toplanıyor.
+Sayılar tek koşumdan. Art arda koşumlarda **doğruluk değişmedi** (16/17/16), ama
+gecikme ve güven farkı oynadı (Jev +0,410 / +0,475; Gemma +0,270 / +0,313; Gemma
+gecikme 203 / 143 ms). Tablodaki kesin haneleri değil, büyüklük sırasını okuyun.
 
-İki uyarı:
+**En önemli satır sonuncusu.** Gemma doğrulukta Jev ile başa baş ve en hızlısı,
+ama güveni tepede yığılıyor: 19 yargının 17'si `≥ 0,90` kovasında. Yani "emin
+olduğunda çalıştır, olmadığında insana sor" tasarımı Gemma ile neredeyse hiçbir
+şeyi elemez — eşik koysanız da her şey geçer. Qwen'de aynı kova 10/19, ve doğru/
+yanlış güven farkı iki buçuk katı. **Gemma'yı seçmek hızı alıp triyajı bırakmaktır.**
 
-* **İki güven sayısı aynı şeyi ölçmez.** Jev'inki kendi tanımı, bizimki
+Üç uyarı:
+
+* **Güven sayıları aynı şeyi ölçmez.** Jev'inki kendi tanımı, Spark kollarınınki
   `1 − H(p)/log k`. Aynı eksende çizilirler ama "Jev'in güveni daha yüksek" gibi
-  bir cümle kurulamaz. Karşılaştırılabilir olan, her birinin KENDİ içinde doğruyu
+  bir cümle kurulamaz. Karşılaştırılabilir olan, her motorun KENDİ içinde doğruyu
   yanlıştan ayırma gücü.
+* **Gemma'da pencere darlığı gerçek bir sınır.** Dağılımı o kadar tepeli ki rakip
+  şıklar sık sık `top-20` penceresine hiç girmiyor (bu sette 19 yargının 1'inde
+  hiçbiri girmedi). O satırlarda güven ölçüm değil, pencerenin ürünüdür; arayüz
+  ve CLI bunu ayrıca işaretler. Sunucudaki `--max-logprobs` varsayılanı 20 olduğu
+  için pencere büyütülemiyor.
 * **19 soru bir ölçüm değildir.** Held-out bölünmüş değil, 12 soru açık uçludan
-  çoktan seçmeliye dönüştürülmüş (ölçülen şey "üretebiliyor mu" değil "ayırt
-  edebiliyor mu"), ve Spark'ın güveni çift tepeli: `0.70–0.90` kovasında hiç vaka
-  yok. Bu tam da şüphelenilmesi gereken şekil.
+  çoktan seçmeliye dönüştürülmüş, ve iki kategori tek soruyla temsil ediliyor.
 
 ## Yöntem
 
@@ -91,6 +109,11 @@ Spark 10/10), hatalar `< 0.70` kovasında toplanıyor.
 **Sunucuda hiçbir ayar değişmiyor.** Sebebi: vLLM'de `--logprobs-mode` varsayılanı
 `raw_logprobs` (değerler "temperature=1.0 gibi" döner, istekteki temperature'dan
 etkilenmez) ve `--max-logprobs` varsayılanı 20 (4-6 seçenek için fazlasıyla yeterli).
+
+Aynı gövde iki modelde de çalışıyor. Qwen3.8 düşünme modu açık geldiği için
+`chat_template_kwargs={"enable_thinking": false}` gönderiliyor; **Gemma bu alanı
+sessizce yok sayıyor** (varken de yokken de ilk token doğrudan harf geliyor,
+ölçüldü), dolayısıyla gövdeyi modele göre dallandırmaya gerek yok.
 
 Güven skoru `1 - H(p)/log k` — Laya'nın `confidence_from_probs` fonksiyonuyla birebir
 aynı formül, böylece iki yaklaşımın sayıları karşılaştırılabilir kalır.
@@ -131,8 +154,6 @@ Bunlar bilinmiyor, tahmin edilmemeli:
   ediliyor. Kapsam dışı bırakılanlar `veri/benchmark_tr.json` içinde listeli.
 * **ECE.** Kalibrasyon şu an kaba kovalarla bakılıyor (`≥0.90 / 0.70–0.90 / <0.70`).
   Tek sayıya indirmek (ECE) daha büyük bir set ister.
-* **Gemma-4.** `--model gemma4-26b` ile çalışması beklenir ama denenmedi; NVFP4
-  kuantizasyonu olasılıkları etkileyebilir, düşünme modunun nasıl kapatıldığı da belirsiz.
 * **`score` / `noul` primitifleri.** Aynı okumanın üstüne kurulur ama ayrı doğrulama
   ister; ölçülmeden eklenmeyecek. Bu yüzden kaynak veri setindeki 2 noul seti
   aktarılmadı — karşılaştırılacak ikinci taraf yok.
