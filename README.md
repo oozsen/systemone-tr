@@ -2,8 +2,10 @@
 
 Mevcut vLLM'den **tipli karar okuması** — Türkçe odaklı, sisteme dokunmadan.
 
-Model cevabı yazmaz; biz yazmadan önce seçeneklerin logit'lerini okuruz. Jev / SemIf'in
-"direct typed logits" deseni, DGX Spark'ta zaten servis edilen Qwen3.8-27B üzerine.
+Model cevabı yazmaz; biz yazmadan önce seçeneklerin logit'lerini okuruz. Jev /
+SemIf'in "direct typed logits" deseni, DGX Spark'ta zaten servis edilen
+Qwen3.8-27B ve Gemma4-26B üzerine. Veri makineden çıkmaz, karar başına ek ücret
+yoktur, sunucuda tek bir ayar değişmez.
 
 ```python
 from systemone import LiteLLMTransport, questions, score
@@ -14,6 +16,35 @@ d.label          # 'faturalama'
 d.confidence     # 0.993
 d.probabilities  # {'faturalama': 0.9990, 'teknik': 0.0005, ...}
 ```
+
+## Neden yerel
+
+Sınıflandırıcının karar verebilmesi için **veriyi görmesi gerekir.** "Bu metin
+gizli mi?", "Kişisel veri içeriyor mu?", "Bu talep hukuka mı gitmeli?" —
+bunların hepsi metne bakmadan cevaplanamaz.
+
+Sınıflandırıcı bir bulut API'siyse, cevap size dönmeden önce veri ağınızdan
+çıkmıştır. **"Bu veri gizli mi?" diye sormak için bile veriyi dışarı vermiş
+olursunuz.** Cevap "evet, gizli" gelse ne fark eder — iş işten geçmiştir. Yani
+kararın en çok önem taşıdığı yerde, tam da orada, bulut sınıflandırıcı kendi
+amacını baltalar.
+
+Bunun için açık ağırlıklı bir Jev sürümü beklemeye gerek yok. **Mekanizma
+modele özel değil.** Zaten servis ettiğiniz herhangi bir modele `max_tokens=1`
+ve `logprobs` göndermek yeterli; sunucuda tek bir ayar değiştirmeden, veriyi
+makineden çıkarmadan, karar başına ek ücret ödemeden çalışır. Bu depo bunu
+DGX Spark'taki Qwen3.8-27B ve Gemma4-26B üzerinde gösteriyor.
+
+**Ama "yerel" otomatik olarak "aynı derecede iyi" demek değil.** Jev tipli ve
+kalibre kararlar için eğitilmiş; genel bir sohbet modeli değil. Kendi
+ölçümümüzde fark modele göre ciddi biçimde değişiyor: Qwen'in güveni doğruyu
+yanlıştan iyi ayırıyor, Gemma'nınki neredeyse hiç ayırmıyor (aşağıdaki tablo).
+Kazandığınız şey gizlilik ve marjinal maliyetin sıfırlanması; ödediğiniz bedel,
+kalibrasyonu kendi modelinizde **kendinizin ölçmek zorunda olması.** Bu depodaki
+düzeneğin asıl işi de bu ölçümü yapmak.
+
+Ücret konusunda dürüst olalım: karar başına marjinal maliyet yok, ama donanım ve
+elektrik gerçek. Tablolarda "bedava" değil **"ölçülmüyor"** yazmasının sebebi bu.
 
 ## Kurulum
 
@@ -118,14 +149,62 @@ yanlış güven farkı iki buçuk katı. **Gemma'yı seçmek hızı alıp triyaj
 
 ## Yöntem
 
-1. Seçenekler `A/B/C...` harflerine eşlenir, modele "yalnız tek harf yaz" denir.
-2. `max_tokens=1` ile tek pozisyon çalıştırılır.
-3. O pozisyonun `top_logprobs`'undan seçenek harfleri süzülür.
-4. Yalnız o küme üzerinde yeniden normalize edilir.
+### Logit nedir, biz ne okuyoruz
 
-**Sunucuda hiçbir ayar değişmiyor.** Sebebi: vLLM'de `--logprobs-mode` varsayılanı
-`raw_logprobs` (değerler "temperature=1.0 gibi" döner, istekteki temperature'dan
-etkilenmez) ve `--max-logprobs` varsayılanı 20 (4-6 seçenek için fazlasıyla yeterli).
+Bir dil modeli her pozisyonda **kelime dağarcığındaki her token için bir sayı**
+üretir. Bu ham sayılara *logit* denir; Qwen3 için pozisyon başına yüz binden
+fazla logit demek. `softmax` bunları olasılığa çevirir:
+
+```
+p(token i) = exp(z_i) / Σ_j exp(z_j)
+```
+
+Normal üretimde bu dağılımdan bir token seçilir (örnekleme ya da en yükseği) ve
+**geri kalan atılır.** Oysa asıl bilgi atılan kısımda: modelin o pozisyonda
+neyi ne kadar olası gördüğü, yani kendi belirsizliği.
+
+Tipli karar okuması bu bilgiyi kurtarır. Üç adım:
+
+1. **Cevabı tek token'a indir.** Seçenekler `A/B/C...` harflerine eşlenir, modele
+   "yalnızca tek bir harf yaz" denir. Böylece kararın tamamı tek bir pozisyona sığar.
+2. **Tek pozisyon çalıştır.** `max_tokens=1`. Tek forward pass, sıfır üretilmiş
+   cevap token'ı. Model cevabı yazmaz — biz yazmadan önce okuruz.
+3. **O pozisyonun dağılımını oku ve daralt.** `logprobs` ile dönen listeden
+   seçenek harfleri süzülür ve yalnız o küme üzerinde yeniden normalize edilir:
+
+```
+p(seçenek i) = exp(z_i) / Σ_{j ∈ seçenekler} exp(z_j)
+```
+
+Bu daraltma "cevap bu seçeneklerden biridir" koşuluna geçmek demektir; modelin
+noktalama, boşluk ya da başka kelimelere ayırdığı olasılık kütlesi atılır.
+
+**Neden bu sayı, modele "ne kadar eminsin" diye sormaktan iyi.** İkincisi
+modelin belirsizlik hakkında *ürettiği metindir* — eğitim verisinde "%90
+eminim" ifadesinin nasıl geçtiğini yansıtır, modelin gerçek iç durumunu değil.
+Logit dağılımı ise doğrudan iç durumun kendisi. Ayrıca `temperature=0`'da
+deterministiktir: aynı soruyu üç kez sorduk, altı ondalığa kadar aynı çıktı.
+(Jev'inki değil — aynı soruda 0.76 ile 0.82 arasında oynadı.)
+
+**Kurtarılan şey bir ihtimal, kesinlik değil.** Dağılımın tepeli olması modelin
+haklı olduğunu göstermez, yalnız kararsız olmadığını gösterir. Bu ikisinin
+birbirini ne kadar tuttuğu ölçülmesi gereken ayrı bir şeydir — kalibrasyon
+tablosunun varlık sebebi bu. Demo setindeki `mantik_kalem` sorusu tam da bunu
+gösteriyor: Gemma `1.00` güvenle yanlış cevap veriyor.
+
+### Sunucuda hiçbir ayar değişmiyor
+
+vLLM'de `--logprobs-mode` varsayılanı `raw_logprobs`: değerler "temperature=1.0
+gibi" döner, istekteki temperature'dan etkilenmez. Dolayısıyla dağılım bozulmaz
+ve `temperature=0` göndermek okumayı değiştirmez.
+
+`--max-logprobs` varsayılanı ise 20 — ve buradaki incelik önemli: dönen liste
+**tüm kelime dağarcığının** top-20'sidir, sizin seçenek kümenizin değil. Prompt
+genelde harfleri tepeye taşır, ama model çok tepeliyse rakip harfler pencereye
+hiç girmeyebilir. Gemma'da tam olarak bu oluyor. O durumda dağılım ölçülmüş
+değil, pencere tarafından kırpılmıştır; kod bunu `missing` / `pencerede` ile
+raporlar ve arayüz açıkça işaretler. Pencere büyütülemiyor: 20'den fazlası 400
+döndürür.
 
 Aynı gövde iki modelde de çalışıyor. Qwen3.8 düşünme modu açık geldiği için
 `chat_template_kwargs={"enable_thinking": false}` gönderiliyor; **Gemma bu alanı
