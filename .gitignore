@@ -1,0 +1,15 @@
+# Sırlar. `.env.*` de kapsanır: editörlerin bıraktığı .env.bak / .env.save
+# gibi yedekler anahtarın birebir kopyasıdır ve commit edilirse sızar.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Ölçüm çıktıları (ham sonuçlar repoya bilinçli olarak eklenir, geçici olanlar değil)
+*.tmp.jsonl

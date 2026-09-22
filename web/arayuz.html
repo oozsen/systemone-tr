@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev / Spark karşılaştırma</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --surface-2: #ffffff;
+    --line:      #e2e1dd;
+    --track:     #f0efec;
+    --text-1:    #0b0b0b;
+    --text-2:    #52514e;
+    --text-3:    #86857f;
+    --iyi:       #008300;
+    --kotu:      #e34948;
+    /* Kategorik seri renkleri: slot 1 (mavi) ve slot 2 (turuncu).
+       Renk VARLIĞA bağlıdır, sırasına değil -- jev her zaman mavi, spark
+       her zaman turuncu. Motor listesi değişince renkler kaymaz. */
+    --s-jev:     #2a78d6;
+    --s-spark:   #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --surface-2: #232322;
+      --line:      #383835;
+      --track:     #2a2a28;
+      --text-1:    #ffffff;
+      --text-2:    #c3c2b7;
+      --text-3:    #8a8a80;
+      --iyi:       #4caf50;
+      --kotu:      #e66767;
+      /* Aynı iki hue, koyu yüzey için yeniden basamaklandı -- otomatik çevirme değil. */
+      --s-jev:     #3987e5;
+      --s-spark:   #d95926;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  /* `.duzen { display: grid }` bir sınıf seçicisi ve [hidden]'ın tarayıcı
+     varsayılanını ezer; sekme gizlenmeden ikisi birden görünür. */
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; padding: 22px;
+    background: var(--surface-1); color: var(--text-1);
+    font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { font-size: 17px; margin: 0 0 2px; font-weight: 600; }
+  h2 { font-size: 13px; margin: 22px 0 9px; font-weight: 600; color: var(--text-1); }
+  h2:first-child { margin-top: 0; }
+  .alt { color: var(--text-2); font-size: 13px; margin: 0 0 16px; max-width: 70ch; }
+  .sayfa { max-width: 1280px; }
+
+  .panel { background: var(--surface-2); border: 1px solid var(--line);
+           border-radius: 10px; padding: 18px; }
+  .duzen { display: grid; grid-template-columns: minmax(330px, 4fr) minmax(400px, 6fr);
+           gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .duzen { grid-template-columns: 1fr; } }
+
+  /* --- sekmeler --- */
+  .sekmeler { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .sekmeler button { padding: 8px 15px; border: 0; border-bottom: 2px solid transparent;
+                     background: none; color: var(--text-2); cursor: pointer; font: inherit; }
+  .sekmeler button[aria-selected="true"] { color: var(--text-1); font-weight: 600;
+                                           border-bottom-color: var(--text-1); }
+
+  /* --- form --- */
+  label { display: block; font-size: 12px; color: var(--text-2); margin: 14px 0 5px; font-weight: 500; }
+  label:first-of-type { margin-top: 0; }
+  textarea, input[type=text], select {
+    width: 100%; background: var(--surface-1); color: var(--text-1);
+    border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px;
+    font: inherit; resize: vertical;
+  }
+  textarea:focus, input:focus, select:focus { outline: 2px solid var(--s-jev); outline-offset: -1px; }
+  .sik { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-bottom: 6px; }
+  .sik button { width: 30px; border: 1px solid var(--line); background: var(--surface-1);
+                color: var(--text-3); border-radius: 7px; cursor: pointer; font-size: 15px; }
+  .sik button:hover { color: var(--kotu); border-color: var(--kotu); }
+  .ekle { margin-top: 2px; padding: 6px 11px; border: 1px dashed var(--line); background: none;
+          color: var(--text-2); border-radius: 7px; cursor: pointer; font: inherit; }
+  .gonder { width: 100%; margin-top: 18px; padding: 11px; border: 0; border-radius: 8px;
+            background: var(--text-1); color: var(--surface-2); font: 600 14px/1 inherit; cursor: pointer; }
+  .gonder:disabled { opacity: .5; cursor: default; }
+  .satirli { display: flex; gap: 14px; flex-wrap: wrap; }
+  .satirli label { margin: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .satirli input { width: auto; }
+
+  /* --- efsane --- */
+  .efsane { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
+            font-size: 12.5px; color: var(--text-2); }
+  .efsane span { display: flex; align-items: center; gap: 6px; }
+  .nokta { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+
+  /* --- karşılaştırmalı çubuklar --- */
+  .sik-satir { margin-bottom: 13px; }
+  .sik-ad { font-size: 13px; margin-bottom: 5px; overflow-wrap: anywhere; }
+  .sik-ad small { color: var(--text-3); font-size: 11.5px; font-weight: 400; }
+  .sik-satir.anahtar .sik-ad { font-weight: 600; }
+  /* Çubuklar arasında 2px yüzey boşluğu: bitişik dolgular birbirine değmesin. */
+  .seri { display: grid; grid-template-columns: 13px 1fr 54px; align-items: center;
+          gap: 7px; margin-bottom: 2px; }
+  .ray { background: var(--track); border-radius: 3px; height: 9px; overflow: hidden; }
+  .dolgu { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+  .deger { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums;
+           text-align: right; }
+
+  /* --- motor başlığı --- */
+  .motorlar { display: grid; gap: 12px; margin-bottom: 18px; }
+  @media (min-width: 620px) { .motorlar.iki { grid-template-columns: 1fr 1fr; } }
+  .motor-kart { border: 1px solid var(--line); border-radius: 9px; padding: 12px 13px; }
+  .motor-ad { font-size: 11.5px; color: var(--text-2); display: flex; align-items: center;
+              gap: 6px; margin-bottom: 4px; }
+  .kazanan { font-size: 18px; font-weight: 650; overflow-wrap: anywhere; line-height: 1.25; }
+  .motor-alt { font-size: 11.5px; color: var(--text-3); margin-top: 5px;
+               font-variant-numeric: tabular-nums; }
+
+  /* --- tablo --- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); }
+  th { font-size: 11.5px; color: var(--text-2); font-weight: 500; white-space: nowrap; }
+  td.say, th.say { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tr.toplam td { font-weight: 600; border-top: 1px solid var(--line); }
+  .baslik-nokta { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* --- rozet / not --- */
+  .rozet { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 11.5px;
+           border: 1px solid currentColor; white-space: nowrap; }
+  .rozet.iyi { color: var(--iyi); } .rozet.kotu { color: var(--kotu); }
+  .notlar { margin: 12px 0 0; padding: 9px 11px; border-radius: 7px;
+            background: var(--surface-1); border: 1px solid var(--line);
+            font-size: 12px; color: var(--text-2); }
+  .notlar p { margin: 0 0 4px; } .notlar p:last-child { margin: 0; }
+  .ipucu { color: var(--text-3); font-size: 11.5px; margin-top: 8px; max-width: 72ch; }
+  .bos { color: var(--text-3); text-align: center; padding: 46px 12px; font-size: 13px; }
+  .hata { color: var(--kotu); }
+  details { margin-top: 13px; }
+  summary { cursor: pointer; font-size: 12px; color: var(--text-2); }
+  pre { background: var(--surface-1); border: 1px solid var(--line); border-radius: 7px;
+        padding: 11px; overflow: auto; font-size: 11.5px; margin: 8px 0 0; max-height: 320px; }
+</style>
+</head>
+<body>
+<div class="sayfa">
+
+<h1>Jev / Spark karşılaştırma</h1>
+<p class="alt">Aynı Türkçe benchmark sorusu iki motora birden gidiyor: Jev
+(typesafe.ai, tipli cevap döndürür) ve DGX Spark'taki vLLM (cevabı yazmadan
+logit'i okunur). Bakılması gereken kazanan şık değil, iki dağılımın şekli ve
+güvenin doğruyu yanlıştan ayırıp ayırmadığı.</p>
+
+<div id="acilis-notlari"></div>
+
+<div class="sekmeler" role="tablist">
+  <button role="tab" aria-selected="true"  data-gorunum="tek">Tek soru</button>
+  <button role="tab" aria-selected="false" data-gorunum="set">Tüm set</button>
+</div>
+
+<!-- ================================================== TEK SORU -->
+<div id="g-tek" class="duzen">
+  <form class="panel" id="form">
+    <label for="ornek">Benchmark sorusu</label>
+    <select id="ornek"><option value="">— boş form —</option></select>
+
+    <label for="kol">Talimat dili <span style="color:var(--text-3)">(state her iki kolda da Türkçe)</span></label>
+    <select id="kol">
+      <option value="tr-q">tr-q — soru Türkçe</option>
+      <option value="en-q">en-q — soru İngilizce</option>
+    </select>
+
+    <label for="durum">Bağlam <span style="color:var(--text-3)">(state)</span></label>
+    <textarea id="durum" rows="6" placeholder="Hakkında karar verilecek metin. Boş bırakırsan soru metni state olarak gider."></textarea>
+
+    <label for="talimat">Soru <span style="color:var(--text-3)">(instructions)</span></label>
+    <textarea id="talimat" rows="2" placeholder="Bu destek talebi hangi departmanı ilgilendirir?"></textarea>
+
+    <label>Şıklar <span style="color:var(--text-3)">(en az 2; açıklama isteğe bağlı)</span></label>
+    <div id="sikler"></div>
+    <button type="button" class="ekle" id="sik-ekle">+ şık ekle</button>
+
+    <label>Motorlar</label>
+    <div class="satirli" id="motor-secim"></div>
+
+    <button class="gonder" id="gonder">İkisine birden sor</button>
+    <p class="ipucu">⌘/Ctrl + Enter ile de gönderebilirsin.</p>
+  </form>
+
+  <div class="panel" id="sonuc">
+    <div class="bos">Henüz soru sorulmadı.</div>
+  </div>
+</div>
+
+<!-- ================================================== TÜM SET -->
+<div id="g-set" hidden>
+  <div class="panel" style="margin-bottom:18px">
+    <div class="satirli" style="align-items:flex-end; gap:22px">
+      <div style="min-width:210px">
+        <label for="set-kol" style="margin-top:0">Talimat dili</label>
+        <select id="set-kol">
+          <option value="tr-q">tr-q — soru Türkçe</option>
+          <option value="en-q">en-q — soru İngilizce</option>
+        </select>
+      </div>
+      <div>
+        <label style="margin-top:0">Motorlar</label>
+        <div class="satirli" id="set-motor-secim"></div>
+      </div>
+      <button class="gonder" id="set-kos" style="width:auto; margin-top:0; padding:9px 20px">
+        Tüm seti koştur
+      </button>
+    </div>
+    <p class="ipucu" id="set-ipucu"></p>
+  </div>
+
+  <div class="panel" id="set-sonuc">
+    <div class="bos">Set henüz koşulmadı.</div>
+  </div>
+</div>
+
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const yuzde = (p) => p == null ? "—" : (p * 100).toFixed(p >= 0.995 || p === 0 ? 0 : 1) + "%";
+const RENK = { jev: "var(--s-jev)", spark: "var(--s-spark)" };
+
+let ACILIS = { motorlar: [], sorular: [], notlar: [] };
+let SORULAR = [];
+let beklenen = null;     // benchmark sorusu yüklüyse cevap anahtarı
+
+const etiketi = (ad) => (ACILIS.motorlar.find(m => m.ad === ad) || {}).etiket || ad;
+const renk = (ad) => RENK[ad] || "var(--text-2)";
+
+// ------------------------------------------------------------------- açılış
+
+fetch("/api/acilis").then(r => r.json()).then(d => {
+  ACILIS = d;
+  SORULAR = d.sorular;
+
+  if (d.notlar.length) {
+    $("#acilis-notlari").innerHTML =
+      `<div class="notlar" style="margin-bottom:16px">${
+        d.notlar.map(n => `<p class="hata">${esc(n)}</p>`).join("")}</div>`;
+  }
+
+  for (const o of SORULAR) {
+    const opt = document.createElement("option");
+    opt.value = o.id;
+    opt.textContent = `[${o.kategori}] ${o.id}${o.donusum === "cevrildi" ? " ·dönüştürülmüş" : ""}`;
+    $("#ornek").append(opt);
+  }
+
+  for (const hedef of ["#motor-secim", "#set-motor-secim"]) {
+    $(hedef).innerHTML = d.motorlar.map(m => `
+      <label><input type="checkbox" value="${esc(m.ad)}" checked>
+        <span class="nokta" style="background:${renk(m.ad)}"></span>
+        ${esc(m.etiket)}</label>`).join("");
+  }
+
+  $("#set-ipucu").textContent =
+    `${SORULAR.length} soru × ${d.motorlar.length} motor. Sorular sırayla, motorlar `
+    + `paralel gider; bitmesi birkaç dakika sürebilir.`;
+});
+
+const seciliMotorlar = (kap) =>
+  [...document.querySelectorAll(`${kap} input[type=checkbox]:checked`)].map(i => i.value);
+
+// --------------------------------------------------------------------- form
+
+function sikSatiri(ad = "", aciklama = "") {
+  const d = document.createElement("div");
+  d.className = "sik";
+  d.innerHTML = `<input type="text" class="s-ad" placeholder="şık">
+                 <input type="text" class="s-ack" placeholder="açıklama (isteğe bağlı)">
+                 <button type="button" title="sil">×</button>`;
+  d.querySelector(".s-ad").value = ad;
+  d.querySelector(".s-ack").value = aciklama;
+  d.querySelector("button").onclick = () => d.remove();
+  return d;
+}
+$("#sik-ekle").onclick = () => $("#sikler").append(sikSatiri());
+
+function soruYukle() {
+  const o = SORULAR.find(x => x.id === $("#ornek").value);
+  beklenen = null;
+  if (!o) return;
+  $("#durum").value = o.durum;
+  $("#talimat").value = $("#kol").value === "tr-q" ? o.talimat_tr : o.talimat_en;
+  $("#sikler").innerHTML = "";
+  for (const [ad, ack] of Object.entries(o.secenekler)) $("#sikler").append(sikSatiri(ad, ack));
+  beklenen = o.dogru;
+}
+$("#ornek").onchange = soruYukle;
+$("#kol").onchange = () => { if ($("#ornek").value) soruYukle(); };
+
+$("#form").onsubmit = (e) => { e.preventDefault(); sor(); };
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sor(); }
+});
+
+// ------------------------------------------------------------------ sekmeler
+
+document.querySelector(".sekmeler").onclick = (e) => {
+  const b = e.target.closest("button[data-gorunum]");
+  if (!b) return;
+  for (const x of document.querySelectorAll(".sekmeler button"))
+    x.setAttribute("aria-selected", String(x === b));
+  $("#g-tek").hidden = b.dataset.gorunum !== "tek";
+  $("#g-set").hidden = b.dataset.gorunum !== "set";
+};
+
+// ------------------------------------------------------------------ tek soru
+
+async function sor() {
+  const secenekler = {};
+  for (const r of document.querySelectorAll("#sikler .sik")) {
+    const ad = r.querySelector(".s-ad").value.trim();
+    if (ad) secenekler[ad] = r.querySelector(".s-ack").value.trim();
+  }
+  const motorlar = seciliMotorlar("#motor-secim");
+  if (!motorlar.length) return hata($("#sonuc"), { hata: "En az bir motor seç." });
+
+  $("#gonder").disabled = true;
+  $("#gonder").textContent = "soruluyor…";
+  try {
+    const r = await fetch("/api/sor", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        durum: $("#durum").value, talimat: $("#talimat").value,
+        secenekler, motorlar, beklenen,
+      }),
+    });
+    const d = await r.json();
+    r.ok ? cizTek(d) : hata($("#sonuc"), d);
+  } catch (err) {
+    hata($("#sonuc"), { hata: String(err) });
+  } finally {
+    $("#gonder").disabled = false;
+    $("#gonder").textContent = "İkisine birden sor";
+  }
+}
+
+function hata(kap, d) {
+  kap.innerHTML = `<div class="bos hata"><strong>${esc(d.hata || "Hata")}</strong>
+    ${d.detay ? `<pre>${esc(d.detay)}</pre>` : ""}</div>`;
+}
+
+function efsane(motorlar) {
+  return `<div class="efsane">${motorlar.map(m =>
+    `<span><span class="nokta" style="background:${renk(m)}"></span>${esc(etiketi(m))}</span>`
+  ).join("")}</div>`;
+}
+
+function cizTek(d) {
+  const adlar = Object.keys(d.kararlar);
+  const calisan = adlar.filter(m => !d.kararlar[m].hata);
+
+  // Motor başlıkları: kazanan şık + anahtarla karşılaştırma.
+  const kartlar = adlar.map(m => {
+    const k = d.kararlar[m];
+    if (k.hata) {
+      return `<div class="motor-kart">
+        <div class="motor-ad"><span class="nokta" style="background:${renk(m)}"></span>${esc(etiketi(m))}</div>
+        <div class="hata" style="font-size:12.5px">${esc(k.hata)}</div></div>`;
+    }
+    let rozet = "";
+    if (d.beklenen) {
+      const ok = k.etiket === d.beklenen;
+      rozet = ` <span class="rozet ${ok ? "iyi" : "kotu"}">${ok ? "✓ anahtar" : "✗ yanlış"}</span>`;
+    }
+    const ucret = k.maliyet == null ? "ücret ölçülmüyor"
+      : `${k.maliyet_tahmini ? "~$" : "$"}${k.maliyet.toFixed(6)}${k.maliyet_tahmini ? " (tahmini)" : ""}`;
+    return `<div class="motor-kart">
+      <div class="motor-ad"><span class="nokta" style="background:${renk(m)}"></span>${esc(etiketi(m))}</div>
+      <div class="kazanan">${esc(k.etiket)}${rozet}</div>
+      <div class="motor-alt">güven ${k.guven.toFixed(3)} · ${Math.round(k.gecikme_ms)} ms · ${esc(ucret)}</div>
+    </div>`;
+  }).join("");
+
+  // Şık başına gruplanmış çubuk: aynı satırda iki motor, ortak 0–100% ekseni.
+  const siklar = Object.keys(d.secenekler);
+  const siraAnahtari = (s) => Math.max(...calisan.map(m => d.kararlar[m].olasiliklar[s] ?? 0), 0);
+  siklar.sort((a, b) => siraAnahtari(b) - siraAnahtari(a));
+
+  const satirlar = siklar.map(s => {
+    const anahtar = d.beklenen === s;
+    const ack = d.secenekler[s];
+    const seriler = calisan.map(m => {
+      const p = d.kararlar[m].olasiliklar[s] ?? 0;
+      return `<div class="seri" title="${esc(etiketi(m))} — ${esc(s)}: ${yuzde(p)}">
+        <span class="nokta" style="background:${renk(m)}"></span>
+        <div class="ray"><div class="dolgu" style="width:${(p * 100).toFixed(2)}%;background:${renk(m)}"></div></div>
+        <span class="deger">${yuzde(p)}</span></div>`;
+    }).join("");
+    return `<div class="sik-satir ${anahtar ? "anahtar" : ""}">
+      <div class="sik-ad">${esc(s)}${anahtar ? ' <span class="rozet iyi">✓ anahtar</span>' : ""}
+        ${ack ? `<small>— ${esc(ack)}</small>` : ""}</div>
+      ${seriler}</div>`;
+  }).join("");
+
+  const notlar = calisan.flatMap(m =>
+    (d.kararlar[m].notlar || []).map(n => `<p>${esc(etiketi(m))}: ${esc(n)}</p>`)).join("");
+
+  $("#sonuc").innerHTML = `
+    <div class="motorlar ${adlar.length === 2 ? "iki" : ""}">${kartlar}</div>
+    ${calisan.length ? efsane(calisan) + satirlar : ""}
+    ${notlar ? `<div class="notlar">${notlar}</div>` : ""}
+    <p class="ipucu">İki güven sayısı aynı şeyi ölçmez: Jev'inki kendi tanımı,
+      Spark'ınki <code>1 − H(p)/log k</code>. Aynı ölçekte çizilirler ama birebir
+      eşitlenemezler — karşılaştırılabilir olan, her birinin kendi içinde doğruyu
+      yanlıştan ayırıp ayırmadığı.</p>
+    <details><summary>Ham cevaplar</summary><pre>${esc(JSON.stringify(d, null, 2))}</pre></details>`;
+}
+
+// ------------------------------------------------------------------- tüm set
+
+$("#set-kos").onclick = async () => {
+  const motorlar = seciliMotorlar("#set-motor-secim");
+  if (!motorlar.length) return hata($("#set-sonuc"), { hata: "En az bir motor seç." });
+
+  $("#set-kos").disabled = true;
+  $("#set-kos").textContent = "koşuyor…";
+  $("#set-sonuc").innerHTML = `<div class="bos">Koşuyor — ${SORULAR.length} soru ×
+    ${motorlar.length} motor. Sayfayı kapatma.</div>`;
+  try {
+    const r = await fetch("/api/kos", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kol: $("#set-kol").value, motorlar }),
+    });
+    const d = await r.json();
+    r.ok ? cizSet(d) : hata($("#set-sonuc"), d);
+  } catch (err) {
+    hata($("#set-sonuc"), { hata: String(err) });
+  } finally {
+    $("#set-kos").disabled = false;
+    $("#set-kos").textContent = "Tüm seti koştur";
+  }
+};
+
+const basliklar = (ms) => ms.map(m =>
+  `<th class="say"><span class="baslik-nokta">
+     <span class="nokta" style="background:${renk(m)}"></span>${esc(etiketi(m))}</span></th>`).join("");
+
+const hucre = (h) => h && h.n
+  ? `<td class="say">${h.dogru}/${h.n} <span style="color:var(--text-3)">${yuzde(h.oran)}</span></td>`
+  : `<td class="say" style="color:var(--text-3)">—</td>`;
+
+function cizSet(d) {
+  const ms = Object.keys(d.ozet);
+
+  const ozetKart = ms.map(m => {
+    const o = d.ozet[m];
+    const ucret = o.maliyet == null ? "ölçülmüyor"
+      : `${o.maliyet_tahmini ? "~$" : "$"}${o.maliyet.toFixed(4)}`;
+    return `<div class="motor-kart">
+      <div class="motor-ad"><span class="nokta" style="background:${renk(m)}"></span>${esc(etiketi(m))}</div>
+      <div class="kazanan">${o.dogru}/${o.n} <span style="font-size:13px;color:var(--text-2);font-weight:400">${yuzde(o.oran)}</span></div>
+      <div class="motor-alt">gecikme medyan ${Math.round(o.gecikme_medyan)} ms ·
+        en yavaş ${Math.round(o.gecikme_max)} ms · ücret ${esc(ucret)}</div>
+    </div>`;
+  }).join("");
+
+  const katSatir = d.kategori.map(s =>
+    `<tr><td>${esc(s.kategori)}</td>${ms.map(m => hucre(s.hucreler[m])).join("")}</tr>`).join("");
+  const donSatir = d.donusum.map(s =>
+    `<tr><td>${esc(s.etiket)}</td>${ms.map(m => hucre(s.hucreler[m])).join("")}</tr>`).join("");
+  const toplam = `<tr class="toplam"><td>TOPLAM</td>${ms.map(m =>
+    `<td class="say">${d.ozet[m].dogru}/${d.ozet[m].n}
+       <span style="color:var(--text-3)">${yuzde(d.ozet[m].oran)}</span></td>`).join("")}</tr>`;
+
+  const kalSatir = d.kalibrasyon.kovalar.map(k =>
+    `<tr><td>güven ${esc(k.kova)}</td>${ms.map(m => hucre(k.hucreler[m])).join("")}</tr>`).join("");
+  const ayrSatir = `<tr class="toplam"><td>ortalama güven farkı<br>
+      <span style="font-weight:400;color:var(--text-3);font-size:11.5px">doğrularda − yanlışlarda</span></td>
+    ${ms.map(m => {
+      const a = d.kalibrasyon.ayrisma[m];
+      if (a.fark == null) return `<td class="say" style="color:var(--text-3)">—
+        <br><span style="font-size:11px;font-weight:400">${a.yanlis_sayisi ? "" : "hiç yanlış yok"}</span></td>`;
+      return `<td class="say">${a.fark >= 0 ? "+" : ""}${a.fark.toFixed(3)}
+        <br><span style="font-size:11px;color:var(--text-3);font-weight:400">
+        ${a.dogruda.toFixed(2)} / ${a.yanlista.toFixed(2)}</span></td>`;
+    }).join("")}</tr>`;
+
+  const anl = d.anlasmazlik.length ? `
+    <h2>Motorların ayrıştığı sorular (${d.anlasmazlik.length})</h2>
+    <p class="alt">Ortalama doğruluktan daha çok şey söyler: hangi soru türünün
+      gerçekten ayırt edici olduğunu gösterir.</p>
+    <table><thead><tr><th>soru</th><th>kategori</th><th>anahtar</th>${basliklar(ms)}</tr></thead>
+    <tbody>${d.anlasmazlik.map(a => `<tr>
+      <td>${esc(a.soru_id)}</td><td>${esc(a.kategori)}</td><td>${esc(a.beklenen)}</td>
+      ${ms.map(m => {
+        const h = a.hucreler[m];
+        return `<td class="say"><span class="rozet ${h.dogru ? "iyi" : "kotu"}">${
+          h.dogru ? "✓" : "✗"} ${esc(h.etiket)}</span>
+          <br><span style="color:var(--text-3);font-size:11.5px">${h.guven.toFixed(2)}</span></td>`;
+      }).join("")}</tr>`).join("")}</tbody></table>` : "";
+
+  const hatalar = d.hatalar.length ? `<div class="notlar">${d.hatalar.map(h =>
+    `<p class="hata">${esc(etiketi(h.motor))} / ${esc(h.soru_id)}: ${esc(h.hata)}</p>`).join("")}</div>` : "";
+
+  $("#set-sonuc").innerHTML = `
+    <h2>Özet — kol ${esc(d.kol)}, ${d.sure_sn} sn</h2>
+    <div class="motorlar ${ms.length === 2 ? "iki" : ""}">${ozetKart}</div>
+    ${hatalar}
+
+    <h2>Kategori bazında doğruluk</h2>
+    <table><thead><tr><th>kategori</th>${basliklar(ms)}</tr></thead>
+      <tbody>${katSatir}${toplam}</tbody></table>
+
+    <h2>Soru kaynağına göre</h2>
+    <p class="alt">Bu iki satır ayrı okunmalı. “Dönüştürülmüş” sorular kaynakta
+      açık uçluydu; şıklar sonradan üretildi, yani ölçülen şey “üretebiliyor mu”
+      değil “doğrusunu ayırt edebiliyor mu”.</p>
+    <table><thead><tr><th>kaynak</th>${basliklar(ms)}</tr></thead>
+      <tbody>${donSatir}</tbody></table>
+
+    <h2>Kalibrasyon</h2>
+    <p class="alt">Asıl soru bu: güven yüksekken gerçekten daha mı doğru? “Emin
+      olduğunda çalıştır, olmadığında insana sor” tasarımı buna dayanıyor. Alttaki
+      fark ne kadar büyükse güven eşiği o kadar işe yarar; sıfıra yakınsa eşikleme
+      çalışmaz. Her motorun güveni yalnız KENDİ içinde okunur.</p>
+    <table><thead><tr><th>kova</th>${basliklar(ms)}</tr></thead>
+      <tbody>${kalSatir}${ayrSatir}</tbody></table>
+
+    ${anl}
+
+    <h2>Soru soru</h2>
+    <details open><summary>${d.satirlar.length} satır</summary>
+      <table><thead><tr><th>soru</th><th>motor</th><th>beklenen</th><th>bulunan</th>
+        <th class="say">güven</th><th class="say">ms</th></tr></thead>
+      <tbody>${d.satirlar.map(s => `<tr>
+        <td>${esc(s.soru_id)}</td>
+        <td><span class="baslik-nokta"><span class="nokta" style="background:${renk(s.motor)}"></span>${esc(s.motor)}</span></td>
+        <td>${esc(s.beklenen)}</td>
+        <td><span class="rozet ${s.dogru ? "iyi" : "kotu"}">${s.dogru ? "✓" : "✗"} ${esc(s.etiket)}</span></td>
+        <td class="say">${s.guven.toFixed(3)}</td>
+        <td class="say">${Math.round(s.gecikme_ms)}</td></tr>`).join("")}</tbody></table>
+    </details>
+
+    <p class="ipucu">${esc(d.satirlar.length)} yargı, ${esc(SORULAR.length)} soru.
+      Bu bir üretim doğruluk ölçümü değildir: set küçük, held-out bölünmüş değil ve
+      dönüştürülmüş sorular ölçülen şeyi değiştiriyor.</p>
+    <details><summary>Ham rapor</summary><pre>${esc(JSON.stringify(d, null, 2))}</pre></details>`;
+}
+
+// açılışta boş bir form
+$("#sikler").append(sikSatiri(), sikSatiri());
+</script>
+</body>
+</html>
