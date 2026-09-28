@@ -7,6 +7,14 @@ seti. Düzeneğin ayakta olduğunu gösterir, doğruluk ölçmez.
 
     SYSTEMONE_VERISETI=/yol/benim_setim.json python web/sunucu.py
 
+Birden çok set yol ayırıcısıyla (Windows'ta `;`, diğerlerinde `:`) verilirse
+sırayla birleştirilir -- ör. demo + kendi setin tek listede:
+
+    SYSTEMONE_VERISETI=veri/demo_tr.json;veri/benchmark_tr.json
+
+Değer ortam değişkeninden ya da `.env`'den okunur; göreli yollar proje köküne
+göredir. Sonraki bir sette aynı id tekrar ederse o soru `dosya_adı/id` olur.
+
 Kendi benchmark'ın başka bir biçimdeyse `araclar/veriseti_aktar.py`'yi örnek al.
 Setler repoya girmek zorunda değil -- telifi belirsiz ya da özel veriyi dışarıda
 tutmak için `veri/*.json` (demo hariç) bilinçli olarak gitignore'da.
@@ -14,8 +22,19 @@ tutmak için `veri/*.json` (demo hariç) bilinçli olarak gitignore'da.
 import json
 import os
 
+from systemone.config import parse_env_file
+
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-YOL = os.environ.get("SYSTEMONE_VERISETI") or os.path.join(KOK, "veri", "demo_tr.json")
+DEMO = os.path.join(KOK, "veri", "demo_tr.json")
+
+
+def _yollar():
+    deger = (os.environ.get("SYSTEMONE_VERISETI")
+             or parse_env_file(os.path.join(KOK, ".env")).get("SYSTEMONE_VERISETI"))
+    if not deger:
+        return [DEMO]
+    return [y if os.path.isabs(y) else os.path.join(KOK, y)
+            for y in (p.strip() for p in deger.split(os.pathsep)) if y]
 
 
 class Soru:
@@ -76,11 +95,38 @@ class VeriSeti:
         return sorted({s.kategori for s in self.sorular})
 
 
-def yukle(yol=YOL):
+def _oku(yol):
     if not os.path.exists(yol):
         raise SystemExit(
             "Veri seti bulunamadı: %s\n"
             "Depoyla gelen demo seti veri/demo_tr.json'dır; kendi setini "
             "SYSTEMONE_VERISETI ile gösterebilirsin." % yol)
     with open(yol, encoding="utf-8") as f:
-        return VeriSeti(json.load(f))
+        return json.load(f)
+
+
+def yukle(yol=None):
+    """Tek yol ya da yol listesi; verilmezse SYSTEMONE_VERISETI / demo seti."""
+    yollar = [yol] if isinstance(yol, str) else (yol or _yollar())
+    if len(yollar) == 1:
+        return VeriSeti(_oku(yollar[0]))
+
+    birlesik = {"kaynak": [], "not": [], "kapsam_disi": {}, "sorular": []}
+    gorulen = set()
+    for y in yollar:
+        ham = _oku(y)
+        ad = os.path.splitext(os.path.basename(y))[0]
+        if ham.get("kaynak"):
+            birlesik["kaynak"].append(ham["kaynak"])
+        if ham.get("not"):
+            birlesik["not"].append("%s: %s" % (ad, ham["not"]))
+        birlesik["kapsam_disi"].update(ham.get("kapsam_disi", {}))
+        for s in ham["sorular"]:
+            if s["id"] in gorulen:
+                s = dict(s, id="%s/%s" % (ad, s["id"]))
+            gorulen.add(s["id"])
+            birlesik["sorular"].append(s)
+
+    birlesik["kaynak"] = " + ".join(birlesik["kaynak"])
+    birlesik["not"] = "\n".join(birlesik["not"])
+    return VeriSeti(birlesik)
