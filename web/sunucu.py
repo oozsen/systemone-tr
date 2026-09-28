@@ -1,4 +1,4 @@
-"""Jev, Qwen ve Gemma'yı tarayıcıdan yan yana koşturur.
+"""Jev, Qwen, Gemma ve Laya'yı tarayıcıdan yan yana koşturur.
 
     python web/sunucu.py                 # http://127.0.0.1:8100
     python web/sunucu.py --port 9000
@@ -27,7 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, KOK)
 
-from karsilastir import JevMotoru, MotorHatasi, SparkMotoru, veriseti  # noqa: E402
+from karsilastir import JevMotoru, LayaMotoru, MotorHatasi, SparkMotoru, veriseti  # noqa: E402
 from karsilastir import rapor  # noqa: E402
 from systemone import load_config  # noqa: E402
 
@@ -48,6 +48,12 @@ def motorlari_kur(cfg, istenen):
             motorlar["jev"] = JevMotoru(cfg["typesafe_api_key"], cfg["jev_model"])
         except MotorHatasi as e:
             ACILIS_NOTU.append("jev devre dışı — %s" % e)
+
+    if "laya" in istenen:
+        try:
+            motorlar["laya"] = LayaMotoru(cfg["laya_model"], cfg["laya_device"])
+        except MotorHatasi as e:
+            ACILIS_NOTU.append("laya devre dışı — %s" % e)
 
     # Spark kolları aynı ağ geçidini, farklı modelleri kullanır.
     for ad, model_anahtari in (("spark", "model"), ("gemma", "gemma_model")):
@@ -158,7 +164,8 @@ def acilis():
         "motorlar": [
             {"ad": m, "etiket": {"jev": "Jev (typesafe.ai)",
                                  "spark": "Spark / Qwen",
-                                 "gemma": "Spark / Gemma"}.get(m, m),
+                                 "gemma": "Spark / Gemma",
+                                 "laya": "Laya (yerel)"}.get(m, m),
              "model": getattr(MOTORLAR[m], "model", "")}
             for m in MOTORLAR
         ],
@@ -235,7 +242,7 @@ def main():
     ap = argparse.ArgumentParser(description="Jev / Spark karşılaştırma arayüzü")
     ap.add_argument("--port", type=int, default=8100)
     ap.add_argument("--adres", default="127.0.0.1")
-    ap.add_argument("--motor", action="append", choices=["jev", "spark", "gemma"],
+    ap.add_argument("--motor", action="append", choices=["jev", "spark", "gemma", "laya"],
                     help="yalnız bu motor(lar); tekrarlanabilir. Varsayılan: hepsi")
     args = ap.parse_args()
 
@@ -247,7 +254,7 @@ def main():
                 pass
 
     VERI = veriseti.yukle()
-    MOTORLAR = motorlari_kur(load_config(), args.motor or ["jev", "spark", "gemma"])
+    MOTORLAR = motorlari_kur(load_config(), args.motor or ["jev", "spark", "gemma", "laya"])
 
     print("%d soru yüklendi (%s)" % (len(VERI), VERI.kaynak))
     for ad, m in MOTORLAR.items():

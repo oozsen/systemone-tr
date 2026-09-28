@@ -1,6 +1,6 @@
 """Türkçe benchmark'ı üç motorda koşturup terminale raporlar.
 
-    python -m karsilastir.kosu                  # jev + qwen + gemma, kol tr-q
+    python -m karsilastir.kosu                  # jev + qwen + gemma + laya, kol tr-q
     python -m karsilastir.kosu --kol en-q       # talimatlar İngilizce
     python -m karsilastir.kosu --motor spark --motor gemma   # Jev'i atla
     python -m karsilastir.kosu --jsonl cikti.jsonl
@@ -19,11 +19,13 @@ from concurrent.futures import ThreadPoolExecutor
 from systemone import load_config
 
 from . import rapor, veriseti
-from .motor import JevMotoru, MotorHatasi, SparkMotoru
+from .motor import JevMotoru, LayaMotoru, MotorHatasi, SparkMotoru
 
-ETIKET = {"jev": "Jev (typesafe.ai)", "spark": "Spark / Qwen", "gemma": "Spark / Gemma"}
+MOTOR_ADLARI = ["jev", "spark", "gemma", "laya"]
+ETIKET = {"jev": "Jev (typesafe.ai)", "spark": "Spark / Qwen", "gemma": "Spark / Gemma",
+          "laya": "Laya (yerel)"}
 # Tablo başlıkları için: iki Spark kolu da "Spark" diye görünmesin.
-KISA = {"jev": "Jev", "spark": "Qwen", "gemma": "Gemma"}
+KISA = {"jev": "Jev", "spark": "Qwen", "gemma": "Gemma", "laya": "Laya"}
 # Spark kolları aynı ağ geçidini, farklı modelleri kullanır.
 SPARK_MODELLERI = {"spark": "model", "gemma": "gemma_model"}
 
@@ -34,6 +36,8 @@ def motorlari_kur(cfg, istenen):
         try:
             if ad == "jev":
                 motorlar["jev"] = JevMotoru(cfg["typesafe_api_key"], cfg["jev_model"])
+            elif ad == "laya":
+                motorlar["laya"] = LayaMotoru(cfg["laya_model"], cfg["laya_device"])
             else:
                 if not cfg["api_key"]:
                     raise MotorHatasi("SYSTEMONE_API_KEY yok (.env: %s)" % cfg["env_path"])
@@ -62,7 +66,7 @@ def _tablo(baslik, birinci_sutun, satirlar, motorlar, anahtar):
 def main():
     ap = argparse.ArgumentParser(description="Jev / Spark karşılaştırmalı koşum")
     ap.add_argument("--kol", default="tr-q", choices=["tr-q", "en-q"])
-    ap.add_argument("--motor", action="append", choices=["jev", "spark", "gemma"])
+    ap.add_argument("--motor", action="append", choices=MOTOR_ADLARI)
     ap.add_argument("--jsonl", help="her yargıyı bu dosyaya da yaz")
     args = ap.parse_args()
 
@@ -74,7 +78,7 @@ def main():
                 pass
 
     vs = veriseti.yukle()
-    motorlar = motorlari_kur(load_config(), args.motor or ["jev", "spark", "gemma"])
+    motorlar = motorlari_kur(load_config(), args.motor or MOTOR_ADLARI)
     if not motorlar:
         print("\nHiçbir motor kurulamadı.")
         return 2

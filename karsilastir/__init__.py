@@ -12,7 +12,7 @@
 
 Web arayüzü: `python web/sunucu.py`. Toplu koşum: `python -m karsilastir.kosu`.
 """
-from .motor import JevMotoru, Karar, MotorHatasi, SparkMotoru
+from .motor import JevMotoru, Karar, LayaMotoru, MotorHatasi, SparkMotoru
 from . import veriseti
 
-__all__ = ["JevMotoru", "Karar", "MotorHatasi", "SparkMotoru", "veriseti"]
+__all__ = ["JevMotoru", "Karar", "LayaMotoru", "MotorHatasi", "SparkMotoru", "veriseti"]

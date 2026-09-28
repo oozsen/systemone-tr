@@ -18,6 +18,8 @@ DEFAULTS = {
     # Aynı ağ geçidinde servis edilen ikinci model. Karşılaştırmanın üçüncü kolu.
     "SYSTEMONE_GEMMA_MODEL": "gemma4-26b",
     "JEV_MODEL": "jev-latest",
+    # "sahip/repo/alt_klasör": Türkçe için multilingual checkpoint.
+    "LAYA_MODEL": "convaiinnovations/laya/multilingual",
 }
 
 
@@ -64,6 +66,9 @@ def load(env_path=None):
         # Karşılaştırmanın Jev kolu. Yoksa None; çağıran taraf tek kolla devam eder.
         "typesafe_api_key": get("TYPESAFE_API_KEY"),
         "jev_model": get("JEV_MODEL", DEFAULTS["JEV_MODEL"]),
+        # Laya bu süreçte koşar; cihaz boşsa laya kendisi seçer (cuda -> mps -> cpu).
+        "laya_model": get("LAYA_MODEL", DEFAULTS["LAYA_MODEL"]),
+        "laya_device": get("LAYA_DEVICE"),
         "env_path": env_path,
         "env_found": bool(file_values),
     }

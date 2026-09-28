@@ -63,7 +63,7 @@ python run_demo.py --docker
 
 ## Karşılaştırmalı arayüz
 
-Aynı Türkçe benchmark sorusunu üç motora birden sorar ve dağılımları yan yana
+Aynı Türkçe benchmark sorusunu dört motora birden sorar ve dağılımları yan yana
 gösterir:
 
 | kol | nedir | nasıl okunur |
@@ -71,8 +71,12 @@ gösterir:
 | `jev` | typesafe.ai System One | tipli cevabı API döndürür |
 | `spark` | DGX Spark / Qwen3.8-27B-FP8 | cevap yazılmadan logit okunur |
 | `gemma` | DGX Spark / Gemma4-26B | cevap yazılmadan logit okunur |
+| `laya` | [Laya](https://github.com/NandhaKishorM/laya) multilingual (mmBERT, 322M) | bu makinede, tek ileri geçişte tipli cevap |
 
-İki Spark kolu aynı LiteLLM ağ geçidini, farklı modelleri kullanır.
+İki Spark kolu aynı LiteLLM ağ geçidini, farklı modelleri kullanır. Laya bir LLM
+değil, açık ağırlıklı (Apache 2.0) bir encoder karar modeli; vLLM'e değil bu
+sürece yüklenir. İsteğe bağlı bağımlılıktır (`pip install laya`, torch getirir);
+kurulu değilse kol devre dışı kalır, depo yine bağımlılıksız çalışır.
 
 ```bash
 cp .env.example .env     # SYSTEMONE_API_KEY + TYPESAFE_API_KEY doldur
@@ -98,6 +102,15 @@ Kendi setinizi bağlamak için aynı şemada bir JSON yazıp gösterin:
 ```bash
 SYSTEMONE_VERISETI=/yol/benim_setim.json python web/sunucu.py
 ```
+
+Birden çok set yol ayırıcısıyla (Windows'ta `;`, diğerlerinde `:`) birleştirilir;
+değer `.env`'e de yazılabilir, göreli yollar proje köküne göredir:
+
+```bash
+SYSTEMONE_VERISETI=veri/demo_tr.json;veri/benchmark_tr.json
+```
+
+Sonraki bir sette aynı soru id'si tekrar ederse o soru `dosya_adı/id` olarak görünür.
 
 Kendi benchmark'ınız başka biçimdeyse `araclar/veriseti_aktar.py` dönüştürme
 betiğine örnektir. `veri/*.json` (demo hariç) bilinçli olarak gitignore'da:
@@ -146,6 +159,25 @@ yanlış güven farkı iki buçuk katı. **Gemma'yı seçmek hızı alıp triyaj
   için pencere büyütülemiyor.
 * **19 soru bir ölçüm değildir.** Held-out bölünmüş değil, 12 soru açık uçludan
   çoktan seçmeliye dönüştürülmüş, ve iki kategori tek soruyla temsil ediliyor.
+
+#### Laya (28.09.2026, aynı 19 soru, ayrı koşum)
+
+Laya 0.3.5, `convaiinnovations/laya/multilingual`, Windows'ta CPU'da:
+
+| | Laya |
+|---|---|
+| Doğruluk | 3/19 (%15,8) |
+| Gecikme (medyan) | 823 ms (CPU — Spark sayılarıyla aynı zeminde değil) |
+| Güven farkı | +0,334 |
+| Güveni ≥ 0,90 olan yargı | 2/19, ikisi de yanlış |
+
+Bu set bilgi, mantık ve hesap soruyor (Keloğlan, il sayısı, faiz); şıkların
+çoğu dört-beş olduğu için 3/19 rastgele tahmin düzeyinde. Bu Laya'nın kusuru
+değil, kapsamı: tek ileri geçişli bir encoder bilgiyi üretmez, metinde olanı
+sınıflandırır. Laya'nın kendi README'si de taban checkpoint'ler için "sıfır
+atışlı karar motoru değil, ince ayar için hızlı bir taban" diyor. Demo setinde
+destek triyajı soruları 4/4 geldi, Türkçe dil soruları 0/2. Yani Laya'yı bu
+depoda okumanın doğru yolu triyaj tipli sorular; bilgi soruları değil.
 
 ## Yöntem
 

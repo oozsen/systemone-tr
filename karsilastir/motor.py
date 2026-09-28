@@ -1,11 +1,13 @@
-"""İki karar motoru, tek arayüz: `karar(durum, talimat, secenekler) -> Karar`.
+"""Üç karar motoru, tek arayüz: `karar(durum, talimat, secenekler) -> Karar`.
 
     Jev     TypeSafe'in barındırdığı System One modeli. Olasılık dağılımını
             doğrudan döndürür; biz logit okumayız, API zaten tipli cevap verir.
+    Laya    Açık ağırlıklı encoder karar modeli, bu süreçte koşar. Jev'le aynı
+            gövde biçimi; isteğe bağlı bağımlılık (laya + torch).
     Spark   DGX Spark'taki vLLM. Model cevabı yazmaz; tek pozisyonun logit'leri
             okunur (systemone.score).
 
-İkisi de aynı `state` ve aynı şık kümesini görür, aynı Karar tipini döndürür --
+Hepsi aynı `state` ve aynı şık kümesini görür, aynı Karar tipini döndürür --
 karşılaştırmanın anlamlı olması buna bağlı.
 
 Neyin karşılaştırılabilir OLMADIĞI:
@@ -21,6 +23,7 @@ Bağımlılık yok: Jev'e de stdlib `urllib` ile gidilir (jev-test `requests`
 kullanıyor, bu proje kullanmıyor).
 """
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -179,6 +182,87 @@ class JevMotoru:
             motor=self.ad, etiket=etiket, olasiliklar=olasiliklar, guven=guven,
             gecikme_ms=gecikme, maliyet=maliyet, maliyet_tahmini=tahmini,
             model=cevap.get("model", self.model),
+        )
+
+
+# -------------------------------------------------------------------------- Laya
+
+
+class LayaMotoru:
+    """Laya -- açık ağırlıklı (Apache 2.0) encoder karar modeli, bu süreçte koşar.
+
+    https://github.com/NandhaKishorM/laya. LLM değil: mmBERT/ModernBERT üzerine
+    eğitilmiş bir karar başlığı, tek ileri geçişte tüm şıkları puanlar. Gövde
+    biçimi Jev'le aynı (`state` + `questions`, cevap `answers.<id>`), bu yüzden
+    harf eşlemesi ve top-20 penceresi burada da yok.
+
+    Varsayılan checkpoint `multilingual`: Türkçe'de İngilizce checkpoint'ten
+    belirgin şekilde iyi. Router kullanılmıyor -- dil tespiti diakritiksiz
+    Türkçeyi İngilizce sanabiliyor.
+
+    Okurken bilinmesi gerekenler:
+
+      * `laya` ve `torch` isteğe bağlı bağımlılık. Kurulu değilse bu kol devre
+        dışı kalır, diğerleri etkilenmez. İlk kurulumda ağırlıklar HF'den iner.
+      * `laya-multilingual` sıcaklık kalibrasyonuyla gelmiyor; güveni şişik
+        olabilir. Güven formülü Spark kollarınınkiyle aynı (`1 - H(p)/log k`).
+      * Taban checkpoint'ler sıfır atışta zayıf; Laya'nın kendi README'si "ince
+        ayar için hızlı bir taban" diyor. Buradaki sayılar ince ayarsız modelin.
+      * Gecikme bu makinenin donanımında ölçülür, Spark'la aynı zeminde değil.
+    """
+
+    ad = "laya"
+
+    def __init__(self, model="convaiinnovations/laya/multilingual", device=None):
+        try:
+            import laya
+        except ImportError:
+            raise MotorHatasi("`laya` paketi kurulu değil (pip install laya).")
+
+        # "sahip/repo/alt_klasör" -> repo + subfolder; iki parçalıysa kök checkpoint.
+        parcalar = model.split("/")
+        repo = "/".join(parcalar[:2])
+        alt = "/".join(parcalar[2:]) or None
+        try:
+            self.ajan = laya.load(repo, device=device or None, subfolder=alt)
+        except Exception as e:
+            raise MotorHatasi("Laya yüklenemedi (%s): %s" % (model, e))
+        self.model = model
+        # Web arayüzü motorları paralel iş parçacıklarında çağırıyor; ajanın
+        # GPU->CPU geri düşüşü kendi durumunu değiştirdiği için çağrıları sırala.
+        self._kilit = threading.Lock()
+
+    def __repr__(self):
+        return "LayaMotoru(%s)" % self.model
+
+    def karar(self, durum, talimat, secenekler):
+        sorular = {"cevap": {
+            "type": "choice", "instructions": talimat,
+            "criteria": {ad: (ack or "") for ad, ack in secenekler.items()},
+        }}
+
+        with self._kilit:
+            t0 = time.perf_counter()
+            try:
+                cevap = self.ajan.predict(durum, sorular)
+            except Exception as e:
+                raise MotorHatasi("laya: %s" % e)
+            gecikme = (time.perf_counter() - t0) * 1000.0
+
+        try:
+            a = cevap["answers"]["cevap"]
+            olasiliklar = {ad: a["probabilities"].get(ad, 0.0) for ad in secenekler}
+            guven = a["confidence"]
+        except (KeyError, TypeError, AttributeError):
+            raise MotorHatasi("Laya cevabı beklenen biçimde değil: %s"
+                              % json.dumps(cevap, ensure_ascii=False, default=str)[:300])
+        # 0.3.2x'teki `min_confidence` açıksa `choice` boş gelebilir; karşılaştırma
+        # için yine en olası şıkkı al.
+        etiket = a.get("choice") or max(olasiliklar, key=olasiliklar.get)
+
+        return Karar(
+            motor=self.ad, etiket=etiket, olasiliklar=olasiliklar, guven=guven,
+            gecikme_ms=gecikme, maliyet=None, model=self.model,
         )
 
 
