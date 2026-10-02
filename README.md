@@ -63,7 +63,7 @@ python run_demo.py --docker
 
 ## Karşılaştırmalı arayüz
 
-Aynı Türkçe benchmark sorusunu dört motora birden sorar ve dağılımları yan yana
+Aynı Türkçe benchmark sorusunu beş motora birden sorar ve dağılımları yan yana
 gösterir:
 
 | kol | nedir | nasıl okunur |
@@ -72,11 +72,20 @@ gösterir:
 | `spark` | DGX Spark / Qwen3.8-27B-FP8 | cevap yazılmadan logit okunur |
 | `gemma` | DGX Spark / Gemma4-26B | cevap yazılmadan logit okunur |
 | `laya` | [Laya](https://github.com/NandhaKishorM/laya) multilingual (mmBERT, 322M) | bu makinede, tek ileri geçişte tipli cevap |
+| `clef` | DGX Spark / [clef-flash](https://huggingface.co/Cloudflare/clef-flash) (Qwen 3.5-9B + şema başlığı) | tek ileri geçişte tipli cevap, Jev'le aynı gövde |
 
 İki Spark kolu aynı LiteLLM ağ geçidini, farklı modelleri kullanır. Laya bir LLM
 değil, açık ağırlıklı (Apache 2.0) bir encoder karar modeli; vLLM'e değil bu
 sürece yüklenir. İsteğe bağlı bağımlılıktır (`pip install laya`, torch getirir);
 kurulu değilse kol devre dışı kalır, depo yine bağımlılıksız çalışır.
+
+clef-flash Spark'ta **isteğe bağlı** bir konteynerde koşar (yüklüyken ~20 GiB tutar):
+kullanmadan önce Spark'ta `docker start clef-flash`, bitince `docker stop clef-flash`.
+Adresi `CLEF_URL`. Konteyner kapalıyken kol yine görünür, istekler "bağlanılamadı"
+hatasıyla döner; sunucuyu yeniden başlatmaya gerek yok. Güven alanı seçilen şıkkın
+olasılığıdır (`max p`), Spark ve Laya kollarındaki entropi tabanlı güven değil.
+Konteynerin kurulumu, yükleyicisi ve bellek bekçisi [`spark/clef-flash/`](spark/clef-flash/README.md)
+klasöründe.
 
 ```bash
 cp .env.example .env     # SYSTEMONE_API_KEY + TYPESAFE_API_KEY doldur

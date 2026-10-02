@@ -1,6 +1,6 @@
 """Türkçe benchmark'ı üç motorda koşturup terminale raporlar.
 
-    python -m karsilastir.kosu                  # jev + qwen + gemma + laya, kol tr-q
+    python -m karsilastir.kosu                  # jev + qwen + gemma + laya + clef, kol tr-q
     python -m karsilastir.kosu --kol en-q       # talimatlar İngilizce
     python -m karsilastir.kosu --motor spark --motor gemma   # Jev'i atla
     python -m karsilastir.kosu --jsonl cikti.jsonl
@@ -19,13 +19,13 @@ from concurrent.futures import ThreadPoolExecutor
 from systemone import load_config
 
 from . import rapor, veriseti
-from .motor import JevMotoru, LayaMotoru, MotorHatasi, SparkMotoru
+from .motor import ClefMotoru, JevMotoru, LayaMotoru, MotorHatasi, SparkMotoru
 
-MOTOR_ADLARI = ["jev", "spark", "gemma", "laya"]
+MOTOR_ADLARI = ["jev", "spark", "gemma", "laya", "clef"]
 ETIKET = {"jev": "Jev (typesafe.ai)", "spark": "Spark / Qwen", "gemma": "Spark / Gemma",
-          "laya": "Laya (yerel)"}
+          "laya": "Laya (yerel)", "clef": "Spark / clef-flash"}
 # Tablo başlıkları için: iki Spark kolu da "Spark" diye görünmesin.
-KISA = {"jev": "Jev", "spark": "Qwen", "gemma": "Gemma", "laya": "Laya"}
+KISA = {"jev": "Jev", "spark": "Qwen", "gemma": "Gemma", "laya": "Laya", "clef": "Clef"}
 # Spark kolları aynı ağ geçidini, farklı modelleri kullanır.
 SPARK_MODELLERI = {"spark": "model", "gemma": "gemma_model"}
 
@@ -38,6 +38,8 @@ def motorlari_kur(cfg, istenen):
                 motorlar["jev"] = JevMotoru(cfg["typesafe_api_key"], cfg["jev_model"])
             elif ad == "laya":
                 motorlar["laya"] = LayaMotoru(cfg["laya_model"], cfg["laya_device"])
+            elif ad == "clef":
+                motorlar["clef"] = ClefMotoru(cfg["clef_url"])
             else:
                 if not cfg["api_key"]:
                     raise MotorHatasi("SYSTEMONE_API_KEY yok (.env: %s)" % cfg["env_path"])

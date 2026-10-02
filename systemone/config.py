@@ -69,6 +69,8 @@ def load(env_path=None):
         # Laya bu süreçte koşar; cihaz boşsa laya kendisi seçer (cuda -> mps -> cpu).
         "laya_model": get("LAYA_MODEL", DEFAULTS["LAYA_MODEL"]),
         "laya_device": get("LAYA_DEVICE"),
+        # clef-flash Spark'ta isteğe bağlı konteynerde; yoksa kol devre dışı.
+        "clef_url": get("CLEF_URL"),
         "env_path": env_path,
         "env_found": bool(file_values),
     }

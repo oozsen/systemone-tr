@@ -18,7 +18,7 @@
     --kotu:      #e34948;
     /* Kategorik seri renkleri: slot 1 (mavi), slot 2 (turuncu), slot 3 (aqua).
        Renk VARLIĞA bağlıdır, sırasına değil -- jev hep mavi, qwen hep turuncu,
-       gemma hep aqua, laya hep mor. Motor listesi değişince renkler kaymaz.
+       gemma hep aqua, laya hep mor, clef hep eflatun. Motor listesi değişince renkler kaymaz.
        Aqua açık yüzeyde 3:1 kontrastın hemen altında (2.82); karşılığı her
        çubuğun yanındaki görünür yüzde etiketi ve "Soru soru" tablosudur --
        kimlik hiçbir yerde yalnız renge bırakılmaz. */
@@ -26,6 +26,7 @@
     --s-spark:   #eb6834;
     --s-gemma:   #1baf7a;
     --s-laya:    #8a4fd1;
+    --s-clef:    #c43d8f;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
@@ -44,6 +45,7 @@
       --s-spark:   #d95926;
       --s-gemma:   #199e70;
       --s-laya:    #a377e8;
+      --s-clef:    #d861a6;
     }
   }
 
@@ -240,7 +242,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const yuzde = (p) => p == null ? "—" : (p * 100).toFixed(p >= 0.995 || p === 0 ? 0 : 1) + "%";
 const RENK = { jev: "var(--s-jev)", spark: "var(--s-spark)", gemma: "var(--s-gemma)",
-               laya: "var(--s-laya)" };
+               laya: "var(--s-laya)", clef: "var(--s-clef)" };
 
 let ACILIS = { motorlar: [], sorular: [], notlar: [] };
 let SORULAR = [];

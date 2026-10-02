@@ -1,9 +1,11 @@
-"""Üç karar motoru, tek arayüz: `karar(durum, talimat, secenekler) -> Karar`.
+"""Dört karar motoru, tek arayüz: `karar(durum, talimat, secenekler) -> Karar`.
 
     Jev     TypeSafe'in barındırdığı System One modeli. Olasılık dağılımını
             doğrudan döndürür; biz logit okumayız, API zaten tipli cevap verir.
     Laya    Açık ağırlıklı encoder karar modeli, bu süreçte koşar. Jev'le aynı
             gövde biçimi; isteğe bağlı bağımlılık (laya + torch).
+    Clef    Cloudflare clef-flash, Spark'ta isteğe bağlı konteyner. Jev'le aynı
+            gövde biçimi, HTTP üzerinden.
     Spark   DGX Spark'taki vLLM. Model cevabı yazmaz; tek pozisyonun logit'leri
             okunur (systemone.score).
 
@@ -259,6 +261,87 @@ class LayaMotoru:
         # 0.3.2x'teki `min_confidence` açıksa `choice` boş gelebilir; karşılaştırma
         # için yine en olası şıkkı al.
         etiket = a.get("choice") or max(olasiliklar, key=olasiliklar.get)
+
+        return Karar(
+            motor=self.ad, etiket=etiket, olasiliklar=olasiliklar, guven=guven,
+            gecikme_ms=gecikme, maliyet=None, model=self.model,
+        )
+
+
+# -------------------------------------------------------------------------- Clef
+
+
+class ClefMotoru:
+    """Cloudflare clef-flash -- DGX Spark'ta, isteğe bağlı açılan konteynerde.
+
+    https://huggingface.co/Cloudflare/clef-flash. Qwen 3.5-9B gövdesi üstüne
+    eğitilmiş bir "joint schema head": metin üretmez, her şıkka bir logit verir.
+    Model kodu Jev'in `/v1/systemone` gövdesini birebir uyguluyor; Spark'taki
+    `~/clef-flash` sarmalayıcısı onu aynı yolla HTTP'ye açıyor. Yani istek ve
+    cevap Jev'inkiyle aynı, harf eşlemesi ve top-20 penceresi yok.
+
+    Okurken bilinmesi gerekenler:
+
+      * Konteyner SÜREKLİ AÇIK DEĞİL (`docker start clef-flash`). Kapalıyken kol
+        kurulur ama her istek anlaşılır bir hatayla döner; sunucuyu yeniden
+        başlatmadan konteyner açılınca çalışmaya başlar.
+      * Güven alanı modelin kendi seçtiği şıkkın olasılığı (`max p`), Spark ve
+        Laya kollarındaki `1 - H(p)/log k` değil. Yalnız kendi içinde okunur.
+      * GPU'yu Qwen ve Gemma'yla paylaşır; paralel koşumda gecikme çekişmelidir.
+    """
+
+    ad = "clef"
+
+    def __init__(self, url, timeout=60.0):
+        if not url:
+            raise MotorHatasi(
+                "CLEF_URL yok. `.env` dosyasına ekle (ör. http://sunucu.local:8101).")
+        self.url = url.rstrip("/") + "/v1/systemone"
+        self.model = "clef-flash"
+        self.timeout = timeout
+
+    def __repr__(self):
+        return "ClefMotoru(%s)" % self.url
+
+    def _istek(self, govde):
+        req = urllib.request.Request(
+            self.url, data=json.dumps(govde).encode("utf-8"), method="POST")
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detay = e.read().decode("utf-8", "replace")[:400]
+            raise MotorHatasi("clef HTTP %d: %s" % (e.code, detay))
+        except urllib.error.URLError as e:
+            raise MotorHatasi(
+                "clef'e bağlanılamadı (%s). Konteyner kapalı olabilir: "
+                "Spark'ta `docker start clef-flash`." % (e.reason,))
+        except json.JSONDecodeError:
+            raise MotorHatasi("clef'ten JSON gelmedi.")
+
+    def karar(self, durum, talimat, secenekler):
+        govde = {
+            "model": self.model,
+            "state": durum,
+            "questions": {"cevap": {
+                "type": "choice", "instructions": talimat,
+                "criteria": {ad: (ack or ad) for ad, ack in secenekler.items()},
+            }},
+        }
+
+        t0 = time.perf_counter()
+        cevap = self._istek(govde)
+        gecikme = (time.perf_counter() - t0) * 1000.0
+
+        try:
+            a = cevap["answers"]["cevap"]
+            olasiliklar = {ad: a["probabilities"][ad] for ad in secenekler}
+            etiket = a["choice"]
+            guven = a["confidence"]
+        except (KeyError, TypeError):
+            raise MotorHatasi("clef cevabı beklenen biçimde değil: %s"
+                              % json.dumps(cevap, ensure_ascii=False)[:300])
 
         return Karar(
             motor=self.ad, etiket=etiket, olasiliklar=olasiliklar, guven=guven,
