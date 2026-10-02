@@ -3,7 +3,8 @@
 Model, Jev'in /v1/systemone istek/yanıt gövdesini birebir uyguluyor
 (joint_schema_model.systemone). Burada yalnızca onu HTTP'ye açıyoruz.
 
-Konteyner isteğe bağlı çalışır: docker start clef-flash / docker stop clef-flash.
+Konteyner isteğe bağlı çalışır: ~/clef-flash/baslat.sh / docker stop clef-flash.
+Düz `docker start` bellek bekçisini (bekci.sh) başlatmaz.
 Eğitim (llamafactory) başlamadan önce durdurulmalı -- yüklüyken ~20 GiB tutar.
 """
 

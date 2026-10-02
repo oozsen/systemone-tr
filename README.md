@@ -80,7 +80,8 @@ sürece yüklenir. İsteğe bağlı bağımlılıktır (`pip install laya`, torc
 kurulu değilse kol devre dışı kalır, depo yine bağımlılıksız çalışır.
 
 clef-flash Spark'ta **isteğe bağlı** bir konteynerde koşar (yüklüyken ~20 GiB tutar):
-kullanmadan önce Spark'ta `docker start clef-flash`, bitince `docker stop clef-flash`.
+kullanmadan önce Spark'ta `~/clef-flash/baslat.sh` (bellek bekçisini de o başlatır; düz
+`docker start` bekçisiz açar), bitince `docker stop clef-flash`.
 Adresi `CLEF_URL`. Konteyner kapalıyken kol yine görünür, istekler "bağlanılamadı"
 hatasıyla döner; sunucuyu yeniden başlatmaya gerek yok. Güven alanı seçilen şıkkın
 olasılığıdır (`max p`), Spark ve Laya kollarındaki entropi tabanlı güven değil.

@@ -282,7 +282,8 @@ class ClefMotoru:
 
     Okurken bilinmesi gerekenler:
 
-      * Konteyner SÜREKLİ AÇIK DEĞİL (`docker start clef-flash`). Kapalıyken kol
+      * Konteyner SÜREKLİ AÇIK DEĞİL (`~/clef-flash/baslat.sh`; düz `docker start`
+        bellek bekçisini atlar, bkz. spark/clef-flash/). Kapalıyken kol
         kurulur ama her istek anlaşılır bir hatayla döner; sunucuyu yeniden
         başlatmadan konteyner açılınca çalışmaya başlar.
       * Güven alanı modelin kendi seçtiği şıkkın olasılığı (`max p`), Spark ve
@@ -316,7 +317,7 @@ class ClefMotoru:
         except urllib.error.URLError as e:
             raise MotorHatasi(
                 "clef'e bağlanılamadı (%s). Konteyner kapalı olabilir: "
-                "Spark'ta `docker start clef-flash`." % (e.reason,))
+                "Spark'ta `~/clef-flash/baslat.sh`." % (e.reason,))
         except json.JSONDecodeError:
             raise MotorHatasi("clef'ten JSON gelmedi.")
 
