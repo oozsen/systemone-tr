@@ -25,3 +25,15 @@ Yeniden kurulum:
       -c 'from huggingface_hub import snapshot_download as s; s("Cloudflare/clef-flash", revision="17f0b0ad64efb65d273590632833508766b2aae6")'
     docker create --name clef-flash --gpus all --memory 28g --memory-swap 28g \
       -p 8101:8101 -v /data/hf:/data/hf:ro clef-flash:local
+
+**Ağ güvenliği (düzenleme notu, 02.10.2026):** `-p 8101:8101` portu tüm arayüzlere
+(`0.0.0.0`) açar ve sarmalayıcıda kimlik doğrulama yok -- paylaşımlı bir ağda
+konteyner açık kaldıkça ağdaki herkes çağırabilir. Önerilen düzen: loopback'e bağla,
+istemciden SSH tüneliyle eriş. Port eşlemesi `docker create` anında sabitlendiği için
+konteyneri yeniden yaratmak gerekir (imaj aynı kalır):
+
+    docker rm clef-flash
+    docker create --name clef-flash --gpus all --memory 28g --memory-swap 28g       -p 127.0.0.1:8101:8101 -v /data/hf:/data/hf:ro clef-flash:local
+    # istemcide:  ssh -N -L 8101:localhost:8101 <spark>   →   CLEF_URL=http://127.0.0.1:8101
+
+Bu yapılana kadar: kullanmadığın an `docker stop clef-flash`.
